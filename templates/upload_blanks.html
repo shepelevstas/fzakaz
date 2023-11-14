@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block js_libs %}
+  {{ block.super }}
+  <script src="{% static 'js/clipboard.min.js' %}"></script>
+{% endblock js_libs %}
+
+{% block js %}
+  <script>
+    ;document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOMContentLoaded')
+      new ClipboardJS('.copylink')
+    });
+  </script>
+{% endblock js %}
+
+{% block content %}
+  {% if edit %}
+    <div class="position-sticky top-0 shadow bg-white p-2">
+      <form action="." method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{form}}
+        <button type='submit' name='action' value='upload' class="btn btn-primary">upload</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="container mt-2">
+    {% for link, count, sh, cls in links %}
+      <div>
+        {% if edit %}
+          <form action="." method="post" class="d-inline-block">
+            {% csrf_token %}
+            <input type="hidden" name="link" value="{{link}}"/>
+            <button class="btn btn-danger btn-sm" type="submit" name='action' value="delete">
+              <i class="bi bi-trash-fill"></i>
+            </button>
+          </form>
+        {% endif %}
+        ({{count}})
+        <a href="{{request.scheme}}://{{request.get_host}}/{{link}}">
+          {{sh}} {{cls}}
+        </a>
+        <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/{{link}}">
+          <i class="bi bi-link-45deg"></i>
+        </button>
+        <a href="{{request.scheme}}://{{request.get_host}}/money_table/{{link}}" class="btn btn-sm"><i class="bi bi-piggy-bank"></i></a>
+      </div>
+    {% endfor %}
+  </div>
+
+
+{% endblock content %}
+

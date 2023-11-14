@@ -1,0 +1,24 @@
+<template id='dropdown-template'>
+  <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+    [[ display(modelValue) ]]
+  </button>
+  <ul class="dropdown-menu" :class="menuClass">
+    <li v-for="(item,idx) in choices" :key="idx">
+      <a @click='$emit("update:modelValue",item)' href="#" class="dropdown-item">[[ display(item) ]] <i v-if="eq(item,modelValue)" class="bi bi-check-lg text-primary"></i></a>
+    </li>
+  </ul>
+</template>
+
+<script>
+  const Dropdown = {
+    template: '#dropdown-template',
+    props: {
+      choices: Array,
+      display: {type:Function,default:item=>item},
+      eq: {type:Function,default:(a,b)=>a==b},
+      modelValue: undefined,
+      menuClass: String,
+    },
+    emits: ['update:modelValue'],
+  }
+</script>

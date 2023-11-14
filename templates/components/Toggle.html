@@ -1,0 +1,20 @@
+<template id='toggle-template'>
+  <button @click='next' class='btn btn-secondary' v-html='display(modelValue)'></button>
+</template>
+
+<script>
+  const Toggle = {
+    template: '#toggle-template',
+    props: {
+      choices: Array,
+      display: {type:Function, default:x=>x},
+      modelValue: undefined,
+    },
+    emits: ['update:modelValue'],
+    methods: {
+      next() {
+        this.$emit('update:modelValue',this.choices[(this.choices.indexOf(this.modelValue)+1)%this.choices.length])
+      },
+    },
+  }
+</script>

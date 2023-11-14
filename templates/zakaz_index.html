@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block js %}
+  <script>
+    ;document.addEventListener('DOMContentLoaded', () => {
+      //const data = JSON.parse('{{data|safe}}')
+      const choices_el = document.querySelector('#choices')
+      let selected_sh = null
+
+      const drawItem = (text, value_name, value) => {
+        return `<div data-${value_name}="${value}" class="card m-2 shadow-sm" style="width:150px;height:150px;"><div class="card-body"><strong>${text}</strong></div></div>`
+      }
+
+      const drawChoices = list => {
+        choices_el.innerHTML = list.map(i=>drawItem(i.text, i.value_name, i.vlaue)).join('')
+      }
+
+      const drawClasses = () => {
+        drawChoices(data.map(i=>({text:i.title, value_name:'sh', vlaue:i.sh})))
+      }
+
+      //drawClasses()
+
+      choices_el.addEventListener('click', ev => {
+        console.log('click', ev)
+        let el = ev.target
+        while (el.dataset.sh === undefined && el.dataset.cls === undefined && el.id !== 'choices') {
+          el = el.parentNode
+        }
+        if (el.id === 'choices') {return}
+        if (el.dataset.sh !== undefined) {
+          selected_sh = null
+        } else if (el.dataset.cls !== undefined) {
+
+        }
+      })
+
+    });
+  </script>
+{% endblock js %}
+
+{% block body %}
+
+  {% if s %}
+    <div class="position-sticky top-0 shadow bg-white">
+      <h2 class="text-center">Школа {{s}}, класс {{c}}</h2>
+    </div>
+  {% endif %}
+
+  <div id="choices" class="d-flex flex-wrap justify-content-center align-content-center m-auto">
+    {% for s in schools %}
+      <a href="{% url 'zakaz_sh_index' s.name %}" data-sh="{{s.name}}" class="card m-2 shadow-sm text-uppercase" style="width:150px;height:150px;">
+        <div class="card-body">
+          <strong>{{s.title}}</strong>
+        </div>
+      </a>
+    {% endfor %}
+
+    {% for c in classes %}
+      <a href="{% url 'zakaz_cls_index' s c %}" data-sh="{{s}}" data-cls="{{c}}" class="card m-2 shadow-sm text-uppercase" style="width:150px;height:150px;">
+        <div class="card-body">
+          <strong>{{c}}</strong>
+        </div>
+      </a>
+    {% endfor %}
+
+    {% if blanks %}
+      {% for blk in blanks %}
+        <a href="{% url 'zakaz' s c blk.uuid %}">
+          <img src="/media/blanks/{{s}}/{{c}}/{{blk.uuid}}/{{blk.blk}}" style="width:150px;">
+        </a>
+      {% endfor %}
+
+      {% comment %} <div>
+        <form action="." method="get">
+          <input type="text" name="img" required="true">
+          <button class="btn btn-outline-success">Перейти к заказу</button>
+        </form>
+      </div> {% endcomment %}
+    {% endif %}
+
+    {% if message %}
+      <strong class="text-secondary">{{message}}</strong>
+    {% endif %}
+  </div>
+
+{% endblock body %}

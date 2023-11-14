@@ -1,0 +1,85 @@
+<template id='app-template'>
+  <div class="row mx-1">
+    <Foto v-for='(img, img_idx) in imgs'
+      :key='img_idx'
+      :img='img'
+      :size='size'
+      :paper='paper'
+      :fit='fit'
+      :dir='dir'
+      :setmousemove='set_mousemove'
+    ></Foto>
+  </div>
+</template>
+
+<script>
+  const app = Vue.createApp({
+    template: '#app-template',
+    components: {Foto},
+    mounted() {
+      document.addEventListener('mouseup', ev=>{
+        this.on_mouse_move = null
+      })
+      document.addEventListener('mousemove', ev=>{
+        if (this.on_mouse_move) {this.on_mouse_move(ev)}
+      })
+    },
+
+    data() {
+      const data = {
+        size: [[102,152],[152,210],[203,305]],
+        paper: ['G','L'],
+        fit: ['cover','contain'],
+        dir: ['hor','ver'],
+        imgs: [
+          {
+            img: '/media/ports/SKY_0002.jpg',
+            prints: [{
+              size: [102, 152],
+              paper: 'G',
+              fit: 'cover',
+              q: 1,
+              x: 20,
+              y: 20,
+              w: 33,
+              dir: 'hor',
+            }],
+            selected_print: null,
+          },
+          {
+            img: '/media/ports/SKY_0002.jpg',
+            prints: [{
+              size: [102, 152],
+              paper: 'G',
+              fit: 'cover',
+              q: 1,
+              x: 20,
+              y: 20,
+              w: 33,
+              dir: 'hor',
+            }],
+            selected_print: null,
+          },
+        ],
+        on_mouse_move: null,
+      }
+
+      data.imgs[0].prints[0].size = data.size[0]
+      data.imgs[0].prints[0].paper = data.paper[0]
+      data.imgs[0].prints[0].fit = data.fit[0]
+      data.imgs[0].selected_print = data.imgs[0].prints[0]
+      data.imgs[1].prints[0].size = data.size[0]
+      data.imgs[1].prints[0].paper = data.paper[0]
+      data.imgs[1].prints[0].fit = data.fit[0]
+      data.imgs[1].selected_print = data.imgs[1].prints[0]
+
+      return data
+    },
+
+    methods: {
+      set_mousemove(f) {this.on_mouse_move = f},
+    },
+  })
+  app.config.compilerOptions.delimiters = ['[[',']]']
+  app.mount('#app')
+</script>

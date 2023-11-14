@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Django32{% endblock title %}</title>
+  <link rel="stylesheet" href="/static/css/bootstrap53a.min.css">
+  <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+  {% block css %}{% endblock css %}
+</head>
+<body class="{% block body_class %}bg-white{% endblock body_class %}">
+  {% block body %}
+    {% block content %}
+      <div class="container">
+        {% block container %}
+          <h3 class="text-secondary">base.html content > container</h3>
+        {% endblock container %}
+      </div>
+    {% endblock content %}
+  {% endblock body %}
+  {% block modal %}{% endblock modal %}
+  {% block js_libs %}
+    <script src="/static/js/bootstrap53a.bundle.min.js"></script>
+  {% endblock js_libs %}
+  {% block js %}{% endblock js %}
+</body>
+</html>

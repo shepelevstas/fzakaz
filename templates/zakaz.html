@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+
+{% block js %}
+  <script>
+    ;document.addEventListener('DOMContentLoaded', (event) => {
+
+      const inputs = document.querySelectorAll('input[type=number][data-price]')
+      const totals = document.querySelectorAll('.total_sum')
+      const subm_btn = document.querySelector('button#submit_btn')
+      const order_form = document.querySelector('form#order_form')
+      const form_subm = document.querySelector('button#form_subm_btn')
+      const eport0 = document.querySelectorAll('.eport0')
+      const eport1 = document.querySelectorAll('.eport1')
+
+      const btns_plus = document.querySelectorAll('button[data-plus]')
+      const btns_minus = document.querySelectorAll('button[data-minus]')
+
+      function calc() {
+        return Array.from(inputs).reduce((m,i)=>
+          m + parseInt(i.value || 0) * parseFloat(i.dataset.price)
+        ,0)
+      }
+
+      function calcSum(e) {
+        const sum = calc()
+        totals.forEach(i=>i.textContent=sum)
+        if (sum >= 1500) {
+          eport0.forEach(i=>i.classList.add('d-none'))
+          eport1.forEach(i=>i.classList.remove('d-none'))
+        } else {
+          eport0.forEach(i=>i.classList.remove('d-none'))
+          eport1.forEach(i=>i.classList.add('d-none'))
+        }
+      }
+
+      inputs.forEach(input=>input.addEventListener('change', calcSum))
+
+      function plus_click(e) {
+        e.preventDefault()
+        const name = e.target.dataset.name
+        const input = document.querySelector(`input[type=number][name="${name}"]`)
+        input.value = (Number(input.value)||0)+1
+        const span = document.querySelector(`span[data-name="${name}"]`)
+        if (span) {span.textContent = input.value}
+        calcSum(e)
+      }
+
+      function minus_click(e) {
+        e.preventDefault()
+        const name = e.target.dataset.name
+        const input = document.querySelector(`input[type=number][name="${name}"]`)
+        input.value = Math.max((Number(input.value)||0)-1, 0)
+        const span = document.querySelector(`span[data-name="${name}"]`)
+        if (span) {span.textContent = input.value}
+        calcSum(e)
+      }
+
+      btns_plus.forEach(btn=>btn.addEventListener('click', plus_click))
+      btns_minus.forEach(btn=>btn.addEventListener('click', minus_click))
+
+      calcSum()
+
+      subm_btn.addEventListener('click', (e) => {
+        form_subm.click()
+      })
+
+      const inputs_arr = Array.from(inputs)
+
+      order_form.addEventListener('submit', (e) => {
+        const sum = calc()
+        if (sum <= 0) {
+          e.preventDefault()
+          alert('Ничего не заказано')
+        } else if (inputs_arr.filter(i=>i.name.endsWith('_tshirt') && i.value != '0').length && !inputs_arr.filter(i=>i.name.endsWith('_tsize') && i.value != '0').length) {
+          e.preventDefault()
+          alert('Заказывая футболку - укажите размер!')
+        }
+      })
+
+    });
+  </script>
+{% endblock js %}
+
+{% block content %}
+
+  <div class="position-sticky top-0 z-1 shadow-sm">
+    <nav class="navbar bg-light pb-0">
+      <div class="container-fluid justify-content-center pb-2 border-bottom">
+        <h5 class="mb-0 me-2">Заказ фотопродукции</h5>
+        <span class="flex-grow-1"></span>
+        <span class="d-flex align-items-center">
+          <strong class="total_sum me-1">0</strong>
+          <strong class="text-secondary me-2">руб</strong>
+          <button id="submit_btn" class="btn btn-outline-success">Сохранить заказ</button>
+        </span>
+      </div>
+
+      <div class="d-none d-md-block w-100">
+        <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
+          При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+        </div>
+
+        <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
+          Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="d-block d-md-none w-100">
+    <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
+      При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+    </div>
+
+    <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
+      Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+    </div>
+  </div>
+
+  <div class="container-fluid py-4">
+    <form action="." method="post" id="order_form" class="">
+      {% csrf_token %}
+
+      <div class="row">
+      {% for good_name, item in goods.items %}
+        <div class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4">
+          <div class="card shadow">
+            {% if "style" in item %}
+              <div class="card-img-top"
+              style="background-image:url('{{blank}}');{{item.style}}"></div>
+            {% endif %}
+            <div class="card-body">
+              <h5 class="card-title"><strong>{{item.title}}</strong></h5>
+              {% for name, good in item.amounts.items %}
+                <!-- name: {{ name }} -->
+                <div class="row border-bottom">
+
+                  <div class="col-4 d-flex align-items-center">{{good.title}}</div>
+                  <div class="col-4 d-flex align-items-center justify-content-center">
+                    {% if name == 'tsize' %}
+                      <span class="text-secondary">см</span>
+                    {% else %}
+                      {{good.price}} <span class="text-secondary ms-1">руб</span>
+                    {% endif %}
+                  </div>
+                  <div class="col-4 d-flex align-items-center">
+
+                    <div class="input-group input-group-sm">
+                      {% if name == 'tsize' %}
+                      {% else %}
+                        <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-minus="1"><i class="bi bi-dash-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                      {% endif %}
+
+                      {% if name == 'tsize' %}
+                        <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control" value="{{good.q}}" data-price="{{good.price}}">
+                      {% else %}
+                        <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control d-none" value="{{good.q}}" data-price="{{good.price}}">
+
+                        <span class="input-group-text fw-bold" data-name="{{good_name}}_{{name}}">{{good.q}}</span>
+                      {% endif %}
+
+                      {% if name == 'tsize' %}
+                      {% else %}
+                        <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+      </div>
+
+      <div class="row justify-content-center mb-3">
+        {% for field in contacts %}
+          <div class="mb-2 col-12 col-md-4 col-xl-3{% if field.errors %} error{% endif %}">
+            {{field}}
+            {{field.errors}}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="row">
+        <div class="col-12 d-flex align-items-center justify-content-center">
+          <div class="">
+            <strong class="total_sum">0</strong>
+            <strong class="text-secondary me-2">руб</strong>
+          </div>
+          <button id="form_subm_btn" class="btn btn-outline-success">Сохранить заказ</button>
+        </div>
+      </div>
+    </form>
+
+  </div>
+
+  <div class="d-block d-md-none w-100">
+    <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
+      При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+    </div>
+
+    <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
+      Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+    </div>
+  </div>
+
+{% endblock content %}
+
+{% block css %}
+  <style>
+    .error > input.form-control {
+      --bs-border-opacity: 1;
+      border-color: rgba(var(--bs-danger-rgb),var(--bs-border-opacity))!important;
+    }
+
+    .error > ul.errorlist > li {
+      --bs-text-opacity: 1;
+      color: rgba(var(--bs-danger-rgb),var(--bs-text-opacity))!important;
+    }
+
+    body {
+      background-color: #f9f9f9;
+    }
+    .load_files {
+      text-align: center;
+      display: block;
+      border: 2px solid lightgray;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .load_files input[type=file] {
+      display: none;
+    }
+    .card_shadow {
+      filter:drop-shadow(0 0 15px rgba(0, 0, 0, 0.1));
+      transition: filter .45s cubic-bezier(.23,1,.32,1) 0ms;
+    }
+    .card_shadow:hover {
+      filter:drop-shadow(0 0 15px rgba(0, 0, 0, 0.25));
+    }
+    .card_shadow:hover .card_text {
+      text-shadow: 0 0 3px black;
+    }
+    #UPQUE .progress {
+      height:2px;
+    }
+
+    .cropper {background-color:white;}
+    .cropper .cropper-scale-handle {
+      {% comment %} display: none; {% endcomment %}
+    }
+    .cropper:hover .cropper-scale-handle {
+      {% comment %} display: block; {% endcomment %}
+      background-color:var(--bs-blue);
+    }
+    .item_select {
+      user-select: none;
+      cursor:pointer;
+    }
+    .item_select:hover {
+      background-color:var(--bs-border-color);
+    }
+  </style>
+{% endblock css %}

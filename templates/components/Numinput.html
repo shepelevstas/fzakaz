@@ -1,0 +1,21 @@
+<template id="number-template">
+  <button @click='add(-1)' class="btn btn-secondary"><i class="bi bi-dash-lg"></i></button>
+  <input :value='modelValue' @change='on_change($event.target.value)' type="text" class="form-control text-center text-muted" style="min-width:44px;">
+  <button @click='add(1)' class="btn btn-secondary"><i class="bi bi-plus-lg"></i></button>
+</template>
+
+<script>
+  const Numinput = {
+    template: '#number-template',
+    props: {modelValue: Number},
+    emits: ['update:modelValue'],
+    methods: {
+      on_change(value) {
+        this.$emit('update:modelValue', parseInt(value)||1)
+      },
+      add(delta) {
+        this.$emit('update:modelValue', this.modelValue + delta)
+      },
+    },
+  }
+</script>

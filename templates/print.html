@@ -1,0 +1,1653 @@
+{% extends 'base.html' %}
+
+{% block css %}
+  <style>
+    .cursor-pointer {cursor: pointer;}
+    .border-dashed {border-style: dashed;}
+
+
+    .responsive-1,.responsive-2 {
+      aspect-ratio:1;
+      width: 100%;
+    }
+    @media (min-width: 440px) {
+      .responsive-1 {width: 50%;}
+    }
+    @media (min-width: 660px) {
+      .responsive-1 {width: 33.3333%;}
+      .responsive-2 {width: 50%;}
+    }
+    @media (min-width: 880px) {
+      .responsive-1 {width: 25%;}
+      .responsive-2 {width: 33.3333%;}
+    }
+    @media (min-width: 1100px) {
+      .responsive-1 {width: 20%;}
+      .responsive-2 {width: 25%;}
+    }
+    @media (min-width: 1320px) {
+      .responsive-1 {width: 16.6666%;}
+      .responsive-2 {width: 20%;}
+    }
+    @media (min-width: 1540px) {
+      .responsive-1 {width: 14.2857%;}
+      .responsive-2 {width: 16.6666%;}
+    }
+    @media (min-width: 1760px) {
+      .responsive-1 {width: 12.5%;}
+      .responsive-2 {width: 14.2857%;}
+    }
+    @media (min-width: 1980px) {
+      .responsive-1 {width: 11.1111%;}
+      .responsive-2 {width: 12.5%;}
+    }
+    @media (min-width: 2200px) {
+      .responsive-2 {width: 11.1111%;}
+    }
+    .responsive-1 .input-group.input-group-sm > button.btn.btn-slim {
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+
+
+
+    {% comment %} MODAL {% endcomment %}
+    .modal-mask {
+      z-index: 9998;
+      background-color: rgba(0, 0, 0, 0.75);
+    }
+
+    {% comment %} Modal Transition {% endcomment %}
+    .modal-enter-from,
+    .modal-leave-to {
+      opacity: 0;
+    }
+
+    .modal-enter-active,
+    .modal-leave-active {
+      transition: opacity .3s ease;
+    }
+
+    .modal-enter-from .modal-slide-up,
+    .modal-leave-to .modal-slide-up {
+      -webkit-transform: translatey(40px);
+      transform: translatey(40px);
+    }
+
+    .modal-enter-active .modal-slide-up,
+    .modal-leave-active .modal-slide-up {
+      transition: transform .3s ease;
+    }
+
+    {% comment %} RESPONSEIVE {% endcomment %}
+    .input-group.input-group-responsive > .btn,
+    .dropdown-responsive > .btn
+    {
+      padding: .25rem .25rem;
+      font-size: .725rem;
+      border-radius: .25rem;
+    }
+
+    .dropdown-responsive > .dropdown-menu
+    {
+      padding: .25rem .35rem;
+      font-size: .725rem;
+      border-radius: .25rem;
+    }
+
+    .dropdown-responsive > .dropdown-menu input.form-control
+    {
+      padding: .175rem .25rem;
+    }
+
+    .responsive-page
+    {
+      width:calc(100% - 40px);
+      height:calc(100% - 190px);
+    }
+
+    @media (min-width:440px) {
+      .input-group.input-group-responsive > .btn,
+      .dropdown-responsive > .btn,
+      .dropdown-responsive > .dropdown-menu
+      {
+        padding: .25rem .5rem;
+        font-size: .875rem;
+        border-radius: .25rem;
+      }
+
+      .dropdown-responsive > .dropdown-menu input.form-control
+      {
+        padding: .275rem .5rem;
+      }
+
+      .responsive-page
+      {
+        width:calc(100% - 60px);
+        height:calc(100% - 200px);
+      }
+    }
+
+    @media (min-width:576px) {
+      .input-group.input-group-responsive > .btn,
+      .dropdown-responsive > .btn
+      {
+        padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+        font-size: var(--bs-btn-font-size);
+        border-radius: var(--bs-btn-border-radius);
+      }
+
+      .dropdown-responsive > .dropdown-menu
+      {
+        padding: 1rem;
+        font-size: var(--bs-dropdown-font-size);
+        border-radius: var(--bs-dropdown-border-radius);
+      }
+
+      .dropdown-responsive > .dropdown-menu input.form-control
+      {
+        padding: .375rem .75rem;
+      }
+
+      .responsive-page
+      {
+        width:calc(100% - 100px);
+        height:calc(100% - 200px);
+      }
+    }
+
+  </style>
+{% endblock css %}
+
+{% block js_libs %}
+  {{ block.super }}
+  <script src="/static/js/vue.global.js"></script>
+{% endblock js_libs %}
+
+{% block js %}
+  <!--UTILS-->
+    <script>
+      const clip = (a,b,x) => Math.min(Math.max(a,x),b)
+
+      const deg_to_rad = Math.PI/180
+
+      // TODO delete
+      const maxy = (img_asp, crop_asp, crop_w_prc) => {
+        return 100 * (1 - img_asp / crop_asp * crop_w_prc / 100)
+      }
+      const maxw = (img_asp, crop_asp, crop_x_prc, crop_y_prc) => {
+        return Math.min(
+          100 - crop_x_prc,
+          (100 - crop_y_prc) * crop_asp / img_asp
+        )
+      }
+      const cropasp = (size, dir='hor') => {
+        if (dir == 'hor') {
+          return Math.max(...size) / Math.min(...size)
+        } else {
+          return Math.min(...size) / Math.max(...size)
+        }
+      }
+      // // delete
+      const floatFormat = (value, precision=10) => {
+        return Math.round(value * precision) / precision
+      }
+
+      const mm_px = (mm, dpi=300) => mm / 25.4 * dpi
+
+      const item_crop_box_px = item => {
+        const w_px = item.naturalWidth * 100 / parseFloat(item.crop.width)
+        return [w_px, w_px / item.asp]
+      }
+
+      const img_too_small = (item, dpi=300) => {
+        const w_px = item.naturalWidth * 100 / parseFloat(item.crop.width)
+        return w_px < mm_px(item.size[0], dpi)
+      }
+
+      const fit_width = item => {
+        const bw = (item.border||0)/item.size[0]*100
+        const k = (100-2*bw) / parseFloat(item.crop.width)
+        item.crop.left = bw+'%'
+        item.crop.width = 100-2*bw+'%'
+        item.crop.top = 50 + (parseFloat(item.crop.top) - 50) * k + '%'
+        item.pref = 'fit_width'
+      }
+
+      const fit_height = item => {
+        const bh = (item.border||0)/item.size[1]*100
+        //const bw = (item.border||0)/item.size[0]*100
+
+        item.crop.top = bh + '%'
+
+        const img_asp = item.asp
+        const page_asp = item.size[0]/item.size[1]
+
+        const new_width = img_asp/page_asp*(100-2*bh)
+        const k = new_width / parseFloat(item.crop.width)
+        item.crop.width = new_width+'%'
+        item.crop.left = 50 + (parseFloat(item.crop.left)-50) * k + '%'
+        item.pref = 'fit_height'
+      }
+
+      const fitin = item => {
+        const w = item.size[0] - 2 * (item.border||0)
+        const h = item.size[1] - 2 * (item.border||0)
+        const page_asp = w / h
+        if (item.asp >= page_asp) {
+          fit_height(item)
+          fit_width(item)
+        } else {
+          fit_width(item)
+          fit_height(item)
+        }
+        item.pref = 'fitin'
+      }
+
+      const cover = item => {
+        const w = item.size[0] - 2 * (item.border||0)
+        const h = item.size[1] - 2 * (item.border||0)
+        const page_asp = w / h
+        if (item.asp >= page_asp) {
+          fit_width(item)
+          fit_height(item)
+        } else {
+          fit_height(item)
+          fit_width(item)
+        }
+        item.pref = 'cover'
+      }
+
+      const prefs = {
+        cover, fitin, fit_width, fit_height
+      }
+
+      const apply_pref = item => {
+        if (item.pref in prefs) {prefs[item.pref](item)}
+      }
+
+      const turn_page = item => {
+        item.size.reverse()
+        apply_pref(item)
+      }
+
+      const set_size = (size, item) => {
+        if (item.size[0] > item.size[1]) {
+          item.size = [Math.max(...size), Math.min(...size)]
+        } else {
+          item.size = [Math.min(...size), Math.max(...size)]
+        }
+        apply_pref(item)
+      }
+
+      const eq_size = (a,b) => {
+        return Math.min(...a) == Math.min(...b) && Math.max(...a) == Math.max(...b)
+      }
+
+      const display_size = value => {
+        if (typeof(value)=='string') {return value}
+        return `${Math.min(...value).toString().slice(0,2)}x${Math.max(...value).toString().slice(0,2)}`
+      }
+
+      const display_size_long = value => {
+        if (typeof(value)=='string') {return value}
+        const short = Math.min(...value)
+        const long = Math.max(...value)
+        return `${short.toString().slice(0,2)}x${long.toString().slice(0,2)} <small class="text-secondary">${short}x${long} mm</small>`
+      }
+
+      const display_paper = value => {
+        return ({G:'глянц.', L:'мат.', P:'жемч.', S:'шёлк'})[value]||value
+      }
+
+      const display_autocolor = value => {
+        return ({
+          1:'<i class="bi bi-toggle-on"></i>',
+          0:'<i class="bi bi-toggle-off"></i>',
+          undefined:'<i class="bi bi-toggle-on"></i>',
+        })[value]||value
+      }
+
+      const display_autocolor_long = value => {
+        const on = '<i class="bi bi-toggle-on"></i> Автокоррекция цвета'
+        return ({
+          1:on,
+          0:'<i class="bi bi-toggle-off"></i> Без автокоррекции',
+          undefined:on,
+        })[value]||value
+      }
+
+      function upload_file(file, data, handle_xhr, onprogress, onabort) {
+        return new Promise((done, fail) => {
+          const form = new FormData()
+          form.append('file', file)
+          for (let k in data) {form.append(k, data[k])}
+          const req = new XMLHttpRequest()
+          req.onload = event => {done(req.response)}
+          if (onprogress) {req.upload.onprogress = onprogress}
+          if (onabort) {req.onabort = onabort}
+          req.open('POST', '{% url "upload_file" %}')
+          req.setRequestHeader('X-CSRFToken', '{{ csrf_token }}')
+          req.responseType = 'json'
+          req.send(form)
+          if (handle_xhr) {handle_xhr(req)}
+        })
+      }
+    </script>
+
+  <!--STORE-->
+    <script>
+      const studio_id = '{% if studio %}{{studio.id}}{% endif %}'
+      const uizoom = Vue.ref(parseInt(window.localStorage.getItem('uizoom')||1))
+      const change_uizoom = delta => {
+        uizoom.value = clip(1,2,uizoom.value+delta)
+        window.localStorage.setItem('uizoom', uizoom.value)
+      }
+
+    </script>
+
+  <!--Toggle-->
+    <template id='toggle-template'>
+      <button @click='next' class='btn btn-light' v-html='display(modelValue)'></button>
+    </template>
+
+    <script>
+      const Toggle = {
+        template: '#toggle-template',
+        props: {
+          choices: Array,
+          display: {type:Function, default:x=>x},
+          modelValue: undefined,
+        },
+        emits: ['update:modelValue'],
+        methods: {
+          next() {
+            this.$emit('update:modelValue',this.choices[(this.choices.indexOf(this.modelValue)+1)%this.choices.length])
+          },
+        },
+      }
+    </script>
+
+
+  <!--Dropdown-->
+    <template id='dropdown-template'>
+      <button class="btn btn-light" :class="btnClass" type="button" data-bs-toggle="dropdown" aria-expanded="false" v-html="display(modelValue)"></button>
+
+      <ul class="dropdown-menu shadow" :class="menuClass">
+        <li v-for="(item,idx) in choices" :key="idx">
+          <a @click.prevent='on_item_click(item)' href="#" class="dropdown-item"><span v-html="display_long(item)"></span> <i v-if="eq(item,modelValue)" class="bi bi-check-lg text-primary"></i></a>
+        </li>
+      </ul>
+    </template>
+
+    <script>
+      const Dropdown = {
+        template: '#dropdown-template',
+        props: {
+          choices: Array,
+          display: {type:Function,default:item=>item},
+          displayLong: {type:Function, default:undefined},
+          eq: {type:Function,default:(a,b)=>a==b},
+          modelValue: undefined,
+          menuClass: String,
+          btnClass: String,
+        },
+        emits: ['update:modelValue'],
+        methods: {
+          on_item_click(item) {
+            if (Array.isArray(item)) {
+              item = [...item]
+            }
+            this.$emit('update:modelValue', item)
+          },
+          display_long(value) {
+            if (this.displayLong) {return this.displayLong(value)}
+            return this.display(value)
+          },
+        },
+      }
+    </script>
+
+  <!--Numinput-->
+    <template id="number-template">
+      <button @click='add(-1)' class="btn btn-light" :class="btnClass"><i class="bi bi-dash-lg"></i></button>
+      <input :value='modelValue' @change='on_change($event.target.value)' type="text" class="form-control text-center text-muted px-0 border-light" style="width:2em;font-weight:bold;">
+      <button @click='add(1)' class="btn btn-light" :class="btnClass"><i class="bi bi-plus-lg"></i></button>
+    </template>
+
+    <script>
+      const Numinput = {
+        template: '#number-template',
+        props: {modelValue: Number, btnClass: String},
+        emits: ['update:modelValue'],
+        methods: {
+          on_change(value) {
+            this.$emit('update:modelValue', parseInt(value)||1)
+          },
+          add(delta) {
+            this.$emit('update:modelValue', this.modelValue + delta)
+          },
+        },
+      }
+    </script>
+
+
+  <!--Modal-->
+    <template id="modal-template">
+      <Transition name="modal">
+        <div v-if="show" class="modal-mask position-fixed start-0 top-0 w-100 h-100 d-flex flex-column align-items-center justify-content-between" tabindex="-1">
+          <div style="height:60px;" class="z-1">
+            <button @click="close" class="btn-close btn-close-white position-absolute top-0 end-0 m-2 p-2"></button>
+            <slot name="header"></slot>
+          </div>
+          <slot name="body"></slot>
+          <div style="height:60px;" class="z-1 w-100"><slot name="footer"></slot></div>
+        </div>
+      <Transition>
+    </template>
+
+    <script>
+      const Modal = {
+        template: "#modal-template",
+        props: {show: Boolean},
+        watch: {
+          show(val) {
+            if (val) {
+              document.addEventListener('keydown', this.onkeydown)
+            } else {
+              document.removeEventListener('keydown', this.onkeydown)
+            }
+          },
+        },
+        methods: {
+          close() {
+            this.$emit('close')
+          },
+
+          onkeydown(ev) {
+            if (ev.code == 'Escape') {this.close()}
+          },
+        },
+      }
+    </script>
+
+
+  <!--Item-->
+    <template id="item-template">
+      <div @mousedown.self="$emit('unselect',$event)" class="position-relative d-flex flex-column align-items-center justify-content-center" :class="{[`responsive-${uizoom}`]:true}">
+
+        <!--Top buttons row-->
+        <div class="input-group input-group-sm mb-1 w-auto">
+          <button @click="cover" class="btn btn-light"><i class="bi bi-fullscreen"></i></button>
+
+          <button @click="fitin" class="btn btn-light"><i class="bi bi-fullscreen-exit"></i></button>
+
+          <button @click="turn_size" class="btn btn-light">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+
+          <!--Modal with crop edit-->
+          <button @click="cropping=true" class="btn btn-light"><i class="bi bi-crop"></i></button>
+
+          <Teleport to="#modal_trg">
+
+            <Modal :show="cropping" @close="cropping=false">
+              <template #body>
+                {% comment %} IMG PART {% endcomment %}
+                <div class="position-relative responsive-page">
+                  {% comment %} PAGE SIZE {% endcomment %}
+                  <div
+                    class="position-absolute m-auto start-0 end-0 top-0 bottom-0 mw-100 mh-100"
+                    :style="{aspectRatio:`${item.size[0]}/${item.size[1]}`}"
+                  >
+                    {% comment %} SHADED IMG {% endcomment %}
+                    <img :src="src" class="position-absolute" :style="item.crop">
+
+                    {% comment %} GRAY SHADE {% endcomment %}
+                    <div class="position-fixed w-100 h-100 start-0 top-0 bg-black opacity-50"></div>
+
+                    {% comment %} IMG SIZE CTRL {% endcomment %}
+                    <div class="position-absolute bottom-100 start-0 end-0 d-flex justify-content-between align-items-center flex-wrap pb-1">
+                      <span class="text-light text-nowrap">
+                        [[ item.size[0] ]] x [[ item.size[1] ]] mm
+                      </span>
+
+                      {% comment %} MENU {% endcomment %}
+                      <div class="dropdown dropdown-responsive">
+                        <button class="btn btn-sm btn-secondary" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                          <span class="text-nowrap me-1">
+                            [[ w_mm() ]] x [[ h_mm() ]] mm
+                          </span>&nbsp;
+
+                          <i class="bi bi-pencil-fill"></i>
+                        </button>
+
+                        {% comment %} MENU POPUP {% endcomment %}
+                        <form class="dropdown-menu dropdown-menu-end shadow">
+                          <div class="mb-2">
+                            <label for="img_w_mm" class="form-label">
+                              <i class="bi bi-distribute-horizontal"></i>
+                              Ширина, mm</label>
+                            <input id="img_w_mm" type="text" :value="w_mm()" @change="on_set_width_mm" class="form-control">
+                          </div>
+
+                          <div class="mb-2">
+                            <label for="img_h_mm" class="form-label">
+                              <i class="bi bi-distribute-vertical"></i>
+                              Высота, mm</label>
+                            <input id="img_h_mm" class="form-control" type="text" :value="h_mm()" @change="on_set_height_mm">
+                          </div>
+
+                          <div class="mb-2">
+                            <label for="img_l_mm" class="form-label">
+                              <i class="bi bi-align-start"></i>
+                              Отступ слева, mm</label>
+                            <input type="text" id="img_l_mm" class="form-control" :value="l_mm()" @change="on_set_left_mm">
+                          </div>
+
+                          <div class="mb-2">
+                            <label for="img_t_mm" class="form-label text-nowrap">
+                              <i class="bi bi-align-top"></i>
+                              Отступ сверху, mm</label>
+                            <input type="text" id="img_t_mm" class="form-control" :value="t_mm()" @change="on_set_top_mm">
+                          </div>
+
+                          <div>
+                            <label for="img_b_mm" class="form-label text-nowrap">
+                              <i class="bi bi-aspect-ratio"></i>
+                              Рамка, mm</label>
+                            <input type="text" id="img_b_mm" class="form-control" :value="item.border || 0" @change="on_set_border_mm">
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+
+                    {% comment %} IMG PRINTABLE PART (PAGE) {% endcomment %}
+                    <div
+                      ref="page"
+                      class="position-absolute w-100 h-100 overflow-hidden bg-white"
+                      @mousedown.capture="move"
+                      style="outline:1px solid var(--bs-secondary);"
+                    >
+                      <img
+                        ref="img"
+                        :src="src"
+                        class="position-absolute user-select-none"
+                        :style="item.crop"
+                        draggable="false"
+                      >
+                      <template v-if="item.border>0">
+                        <div class="position-absolute bg-white start-0 top-0 end-0" :style="{height:borders[1]}"></div>
+                        <div class="position-absolute bg-white start-0 bottom-0 end-0" :style="{height:borders[1]}"></div>
+                        <div class="position-absolute bg-white start-0 top-0 bottom-0" :style="{width:borders[0]}"></div>
+                        <div class="position-absolute bg-white end-0 top-0 bottom-0" :style="{width:borders[0]}"></div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              {% comment %} POSITION/SIZE CTRL {% endcomment %}
+              <template #header>
+                <div class="input-group input-group-responsive mt-3">
+                  <button @click="fit_width" class="btn btn-light"><i class="bi bi-distribute-horizontal"></i></button>
+                  <button @click="align_start" class="btn btn-light"><i class="bi bi-align-start"></i></button>
+                  <button @click="align_center" class="btn btn-light"><i class="bi bi-align-center"></i></button>
+                  <button @click="align_end" class="btn btn-light"><i class="bi bi-align-end"></i></button>
+
+                  <button @click="fit_height" class="btn btn-light"><i class="bi bi-distribute-vertical"></i></button>
+                  <button @click="align_top" class="btn btn-light"><i class="bi bi-align-top"></i></button>
+                  <button @click="align_middle" class="btn btn-light"><i class="bi bi-align-middle"></i></button>
+                  <button @click="align_bottom" class="btn btn-light"><i class="bi bi-align-bottom"></i></button>
+
+                </div>
+              </template>
+
+              {% comment %} SCALE CTRL {% endcomment %}
+              <template #footer>
+
+                <div class="d-flex flex-nowrap px-5">
+                  <button @click="zoom(0.909090909)" class="btn btn-primary"><i class="bi bi-dash-lg"></i></button>
+
+                  <div ref="scale" @mousedown.capture="scale" class="progress flex-fill mx-3 h-auto align-self-stretch user-select-none">
+                    <div class="progress-bar" style="width: 50%;transition:none;"></div>
+                  </div>
+
+                  <button @click="zoom(1.1)" class="btn btn-primary"><i class="bi bi-plus-lg"></i></button>
+                </div>
+
+              </template>
+            </Modal>
+
+          </Teleport>
+          <!--//Crop modal-->
+
+          {% comment %} <button class="btn btn-light"> {% endcomment %}
+            {% comment %} <i class="bi bi-crop"></i> {% endcomment %}
+            {% comment %} <i class="bi bi-pencil-square"></i> {% endcomment %}
+            {% comment %} <i class="bi bi-gear-fill"></i> {% endcomment %}
+            {% comment %} <i class="bi bi-three-dots"></i> {% endcomment %}
+            {% comment %} <i class="bi bi-chat-square-dots"></i> {% endcomment %}
+          {% comment %} </button> {% endcomment %}
+
+          {% comment %} <div class="dropdown"> {% endcomment %}
+            <button class="btn btn-light" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="border-top-right-radius:.25rem;border-bottom-right-radius:.25rem;">
+              <i class="bi bi-three-dots"></i>
+            </button>
+
+            <div class="dropdown-menu dropdown-menu-end p-3 shadow">
+              <input type="text" class="form-control mb-2" :value="item.filename">
+
+              <button @click="$emit('duplicate', item)" class="btn btn-light btn-sm mb-2">
+                <i class="bi bi-files"></i>&nbsp;дублировать
+              </button>
+
+              <div>
+                <label class="text-muted">путь</label>
+                <div class="mb-2">[[ item.path ]]</div>
+              </div>
+
+
+              <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+
+              {% comment %} <div class="mb-2">
+                <label for="img_w_mm" class="form-label">Ширина, mm</label>
+                <input id="img_w_mm" type="text" :value="w_mm()" @change="on_set_width_mm" class="form-control">
+              </div>
+
+              <div class="mb-2">
+                <label for="img_h_mm" class="form-label">Высота, mm</label>
+                <input id="img_h_mm" class="form-control" type="text" :value="h_mm()" @change="on_set_height_mm">
+              </div>
+
+              <div class="mb-2">
+                <label for="img_l_mm" class="form-label">Отступ слева, mm</label>
+                <input type="text" id="img_l_mm" class="form-control" :value="l_mm()" @change="on_set_left_mm">
+              </div>
+
+              <div class="mb-2">
+                <label for="img_t_mm" class="form-label text-nowrap">Отступ сверху, mm</label>
+                <input type="text" id="img_t_mm" class="form-control" :value="t_mm()" @change="on_set_top_mm">
+              </div> {% endcomment %}
+            </div>
+          {% comment %} </div> {% endcomment %}
+        </div>
+        <!--//Top buttons row-->
+
+        <!--Item page-->
+        <div class="shadow position-relative item_page" :style="page_style">
+          <!--Selected frame-->
+          <div v-if="item.selected" class="position-absolute" style="top:-4px;left:-4px;right:-4px;bottom:-4px;background-color:var(--bs-primary);border-radius:4px;"></div>
+
+          <!--clipping mask-->
+          <div class="position-absolute w-100 h-100 top-0 start-0 overflow-hidden bg-white" @mousedown.stop="$emit('select', $event)" style="outline: 1px solid var(--bs-border-color);">
+            <img :src="src" class="position-absolute user-select-none" :style="item.crop" draggable="false">
+
+            <template v-if="item.border>0">
+              <div class="position-absolute bg-white start-0 top-0 end-0" :style="{height:borders[1]}"></div>
+              <div class="position-absolute bg-white start-0 bottom-0 end-0" :style="{height:borders[1]}"></div>
+              <div class="position-absolute bg-white start-0 top-0 bottom-0" :style="{width:borders[0]}"></div>
+              <div class="position-absolute bg-white end-0 top-0 bottom-0" :style="{width:borders[0]}"></div>
+            </template>
+          </div>
+
+          <!--info icons-->
+          <div class="position-absolute d-flex flex-column start-100 top-0 text-center" style="margin-start:5px;width:24px;">
+            <i v-if="too_small" class="bi bi-exclamation-triangle-fill text-warning"></i>
+
+            <i v-if="item.uploading && item.uploading.done == 0" class="bi bi-hourglass text-primary"></i>
+
+            <div v-else-if="item.uploading && item.uploading.done < 100" style="width:24px;height:24px;">
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="var(--bs-border-color)" />
+                {% comment %} x (135deg) = 45*Math.sin(135*Math.PI/180)+50 {% endcomment %}
+                {% comment %} y (135deg) = -45*Math.cos(135*Math.PI/180)+50 {% endcomment %}
+                <path  :d="upload_icon_path_d(item.uploading.done)" fill="var(--bs-primary)" />
+              </svg>
+            </div>
+          </div>
+          <!--//info icons-->
+        </div>
+        <!--//Item page-->
+
+        <!--PRINT CONF--><!--Bottom buttons row-->
+        <div class="input-group input-group-sm mt-1 w-auto">
+
+          <Dropdown
+            :choices="size"
+            :display="display_size"
+            :display-long="display_size_long"
+            :eq="eq_size"
+            :model-value="item.size"
+            @update:model-value="set_item_size"
+            btn-class="btn-slim"
+          ></Dropdown>
+
+          <Toggle
+            :choices="paper"
+            :display="display_paper"
+            v-model="item.paper"
+            class="btn-slim"
+          ></Toggle>
+
+          <Toggle
+            :choices="autocolor"
+            :display="display_autocolor"
+            v-model="item.autocolor"
+            class="btn-slim"
+          ></Toggle>
+
+          <Numinput v-model='item.q' btn-class="btn-slim"></Numinput>
+
+        </div>
+        <!--//PRINT CONF-->
+
+      </div>
+    </template>
+
+    <script>
+      const Item = {
+        template: '#item-template',
+
+        components: {Numinput, Dropdown, Toggle, Modal},
+
+        props: ['item', 'setmousemove'],
+
+        setup(props, {attrs, slots, emit, expose}) {
+          const src = Vue.computed(() => props.item.src || props.item.dataURL || '/{{folder}}/' + props.item.filename)
+
+          const page_style = Vue.computed(() => {
+            const page_asp = props.item.size[0] / props.item.size[1]
+            const style = {aspectRatio: page_asp}
+            if (page_asp > 1) {
+              //style.width = '80%'
+              //style.width = 'max(80%, calc(100% - 80px))'
+              style.width = 'calc(100% - 60px)'
+            }
+            else {
+              style.height = 'calc(100% - 80px)'
+            }
+            return style
+          })
+
+          const too_small = Vue.computed(() => img_too_small(props.item))
+
+          const borders = Vue.computed(() => {
+            if (!props.item.border) {return [0, 0]}
+            return [
+              props.item.border/props.item.size[0]*100+'%',
+              props.item.border/props.item.size[1]*100+'%'
+            ]
+          })
+
+          const size = Vue.readonly([[102,152],[152,210],[203,305],[305,420],[305,450]])
+
+          const paper = Vue.readonly(['G','L'])
+
+          const autocolor = Vue.readonly([0,1])
+
+          const cropping = Vue.ref(false)
+
+          /*const on_img_load = ev => {
+            props.item.asp = ev.target.naturalWidth / ev.target.naturalHeight
+          }*/
+
+          const w_mm = Vue.computed(() => parseFloat(props.item.crop.width) / 100 * props.item.size[0])
+
+          return {
+            src, page_style, too_small, borders, // computed
+            size, paper, autocolor,  // readonly
+            cropping,  // data
+            uizoom,
+            display_size, display_size_long, eq_size, // global funcs
+            //on_img_load, // method
+            w_mm: () => floatFormat(w_mm.value),
+            h_mm: () => floatFormat(w_mm.value / props.item.asp),
+            l_mm: () => floatFormat(props.item.size[0] * parseFloat(props.item.crop.left) / 100),
+            t_mm: () => floatFormat(props.item.size[1] * parseFloat(props.item.crop.top) / 100),
+            display_autocolor,
+            display_paper,
+          }
+        },
+
+        methods: {
+          set_width_mm(mm) {
+            const w1 = mm / this.item.size[0] * 100
+            const k = w1 / parseFloat(this.item.crop.width)
+            this.item.crop.width = w1 + '%'
+            this.item.crop.top = 50 + k * (parseFloat(this.item.crop.top) - 50) + '%'
+            this.item.crop.left = 50 + k * (parseFloat(this.item.crop.left) - 50) + '%'
+          },
+
+          on_set_width_mm(ev) {
+            this.set_width_mm(parseFloat(ev.target.value))
+          },
+
+          on_set_height_mm(ev) {
+            const h_mm = parseFloat(ev.target.value)
+            const w_mm = h_mm * this.item.asp
+            this.set_width_mm(w_mm)
+          },
+
+          on_set_left_mm(ev) {
+            this.item.crop.left = parseFloat(ev.target.value) / this.item.size[0] * 100 + '%'
+          },
+
+          on_set_top_mm(ev) {
+            this.item.crop.top = parseFloat(ev.target.value) / this.item.size[1] * 100 + '%'
+          },
+
+          on_set_border_mm(ev) {
+            this.item.border = parseFloat(ev.target.value)
+          },
+
+          set_item_size(value) {
+            set_size(value, this.item)
+          },
+
+          move(ev) {
+            const page = this.$refs.page
+            const pageRect = page.getBoundingClientRect()
+            const img = this.$refs.img
+            const img_w = img.width
+            const img_h = img.height
+            const x = ev.x
+            const y = ev.y
+            const x0 = parseFloat(this.item.crop.left)
+            const y0 = parseFloat(this.item.crop.top)
+            const w = parseFloat(this.item.crop.width)
+            //const asp = cropasp(print.size, print.dir)
+            //const img_asp = img_w/img_h
+            //const max_x = 100 - print.w
+            //const max_y = maxy(img_asp, asp, print.w)
+            //this.cropping = true
+
+            this.setmousemove(e => {
+              //print.x = clip(0, max_x, x0 + (e.x-x)/img_w*100)
+              //print.y = clip(0, max_y, y0 + (e.y-y)/img_h*100)
+              this.item.crop.left = x0 + (e.x-x)/pageRect.width * 100 + '%'
+              this.item.crop.top = y0 + (e.y-y)/pageRect.height * 100 + '%'
+            }, e => {
+              //this.cropping = false
+            })
+          },
+
+          scale(ev) {
+            const page = this.$refs.page
+            const img = this.$refs.img
+            const scale = this.$refs.scale
+            const progress = scale.firstChild
+            const w = parseFloat(this.item.crop.width)
+            const x = ev.x
+            const l_50 = parseFloat(this.item.crop.left) - 50
+            const t_50 = parseFloat(this.item.crop.top) - 50
+
+            this.setmousemove(e => {
+              const dw = clip(-0.5, 0.5, (e.x-x)/scale.clientWidth)
+              const k = dw*(dw+1.5)+1
+              this.item.crop.width = w * k + '%'
+              this.item.crop.left = 50 + l_50 * k + '%'
+              this.item.crop.top = 50 + t_50 * k + '%'
+              progress.style.width = 50 + 100*dw + '%'
+            }, () => {
+              progress.style.width = '50%'
+            })
+          },
+
+          zoom(k) {
+            this.set_width_mm(k * this.w_mm())
+          },
+
+          fit_width() {
+            //const k = 100 / parseFloat(this.item.crop.width)
+            //this.item.crop.left = '0%'
+            //this.item.crop.width = '100%'
+            //this.item.crop.top = 50 + (parseFloat(this.item.crop.top) - 50) * k + '%'
+            fit_width(this.item)
+          },
+
+          fit_height() {
+            fit_height(this.item)
+          },
+
+          fitin() {
+            fitin(this.item)
+          },
+
+          cover() {
+            cover(this.item)
+          },
+
+          align_top() {
+            this.item.crop.top = (this.item.border||0)/this.item.size[1]*100 + '%'
+          },
+
+          align_bottom() {
+            const img_asp = this.item.asp
+            const page_asp = this.item.size[0]/this.item.size[1]
+
+            const h = parseFloat(this.item.crop.width) * page_asp / img_asp
+            const bh = (this.item.border||0)/this.item.size[1]*100
+
+            this.item.crop.top = 100 - h - bh + '%'
+          },
+
+          align_middle() {
+            const img_asp = this.item.asp
+            const page_asp = this.item.size[0]/this.item.size[1]
+
+            const h = parseFloat(this.item.crop.width) * page_asp / img_asp
+
+            this.item.crop.top = (100 - h)/2 + '%'
+          },
+
+          align_start() {
+            this.item.crop.left = (this.item.border||0)/this.item.size[0]*100 + '%'
+          },
+
+          align_end() {
+            const bw = (this.item.border||0)/this.item.size[0]*100
+            this.item.crop.left = 100 - parseFloat(this.item.crop.width) - bw + '%'
+          },
+
+          align_center() {
+            this.item.crop.left = (100-parseFloat(this.item.crop.width))/2 + '%'
+          },
+
+          turn_size() {
+            turn_page(this.item)
+          },
+
+          upload_icon_path_d(percent) {
+            // x (135deg) = 45*Math.sin(135*Math.PI/180)+50
+            // y (135deg) = -45*Math.cos(135*Math.PI/180)+50
+
+            const rad = 360 /100 *percent *deg_to_rad
+            return `M 50 50 L 50 5 A 45 45 0 ${Number(percent>50)} 1 ${45*Math.sin(rad)+50} ${-45*Math.cos(rad)+50} Z`
+          },
+        },
+      }
+    </script>
+  <!--//Item-->
+
+  <!--APP-->
+  <template id="app-template">
+
+    <div class="position-fixed top-0 start-0 end-0 bottom-0 d-flex flex-column">
+
+      {% comment %} TOP BAR {% endcomment %}
+      <div class="bg-white p-2 shadow-sm border-bottom">
+
+        <!--TOP ROW-->
+        <div class="d-flex flex-wrap">
+          <div>
+            <strong class="d-block fs-4">
+              {% if studio %}
+                {{studio.name}}
+              {% else %}
+                <a href="#">Выбрать студию</a>
+              {% endif %}
+            </strong>
+          </div>
+
+          <div class="flex-grow-1 text-end">
+            <button @click="change_uizoom(-1)" class="btn p-0 px-1 fs-4"><i class="bi bi-dash-lg"></i></button>
+
+            <button @click="change_uizoom(1)" class="btn p-0 px-1 fs-4 me-2"><i class="bi bi-plus-lg"></i></button>
+
+            <button class="btn btn-light btn-outline-primary py-0 fs-4 border-dashed me-2"><i class="bi bi-cloud-upload"></i></button>
+
+            <button class="btn btn-light fs-4 py-0 text-primary"><i class="bi bi-box-arrow-in-left"></i></button>
+          </div>
+        </div>
+        <!--//TOP ROW-->
+
+        <!--2nd row-->
+        <div class="d-flex flex-wrap">
+          <div>
+
+          </div>
+
+          <div class="flex-grow-1 text-end">
+            <strong v-if="selected.length>1||selecting" class="d-block text-nowrap mt-1">Выбрано [[ selected.length ]]</strong>
+            <span v-else-if="items.length" @click.prevent="selecting=true" class="d-block link-primary cursor-pointer mt-1">Выбрать</span>
+          </div>
+        </div>
+        <!--//2nd row-->
+
+        <!--3rd row-->
+        <div class="d-flex flex-wrap">
+          <div>
+            <span v-if="some_too_small" class="text-muted small text-nowrap">
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+              Фото недостаточного разрешения
+            </span>
+          </div>
+
+          <div class="flex-grow-1 text-end">
+            <span v-if="selected.length>1||selecting" class="link-primary small cursor-pointer text-nowrap" @click.prevent="cancel_selecting">Сбросить выбор</span>
+            <span v-else-if="items.length" @click.prevent="select_all" class="link-primary small cursor-pointer text-nowrap">Выбрать все</span>
+          </div>
+        </div>
+        <!--//3rd row-->
+
+      </div>
+      {% comment %} //TOP BAR {% endcomment %}
+
+      {% comment %} ITEMS ZONE {% endcomment %}
+      <div class="flex-grow-1 overflow-auto w-100"
+        ref="items_zone"
+        @drop.prevent="ondrop"
+        @dragover.prevent
+        @dragenter="ondragenter"
+        @dragleave="ondragleave"
+        @mousedown.self="workspace_mousedown"
+      >
+
+        {% comment %} ITEMS {% endcomment %}
+        <div @mousedown.self="workspace_mousedown" class="d-flex flex-wrap">
+
+          <Item v-for="(item, index) in items"
+            :key="index"
+            :item="item"
+            :setmousemove='set_mousemove'
+            @select="img_mousedown(item, $event)"
+            @unselect="workspace_mousedown"
+            :ref="el => { itemRefs[index] = el }"
+            @duplicate='duplicate_item'
+          ></Item>
+
+        </div>
+
+        <!--select box-->
+        <div ref="select_box" class="position-absolute border border-primary bg-primary-subtle opacity-50 z-2"></div>
+      </div>
+      {% comment %} //ITEMS ZONE {% endcomment %}
+
+      {% comment %} FOOT BAR {% endcomment %}
+      <div v-if="selected.length > 1" class="text-center p-2 shadow-lg border-top">
+        <div class="d-inline-block w-auto input-group input-group-sm me-2">
+          <button @click="cover_selected" class="btn btn-light">
+            <i class="bi bi-fullscreen"></i>
+          </button>
+
+          <button @click="fitin_selected" class="btn btn-light">
+            <i class="bi bi-fullscreen-exit"></i>
+          </button>
+
+          <button @click="turn_selected" class="btn btn-light">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+
+          <Dropdown
+            :choices="size"
+            :display="display_size"
+            :display-long="display_size_long"
+            :eq="eq_size"
+            :model-value="selected_items_size"
+            @update:model-value="set_selected_items_size"
+          ></Dropdown>
+
+          <Dropdown
+            :choices="paper"
+            :display="display_paper"
+            :model-value="selected_items_paper"
+            @update:model-value="set_selected_items_paper"
+          ></Dropdown>
+
+          <Dropdown
+            :choices="autocolor"
+            :display="display_autocolor"
+            :display-long="display_autocolor_long"
+            :model-value="selected_items_autocolor"
+            @update:model-value="set_selected_items_autocolor"
+          ></Dropdown>
+
+          <button @click="duplicate_selected" class="btn btn-light">
+            <i class="bi bi-files"></i>
+          </button>
+        </div>
+      </div>
+      {% comment %} //FOOT BAR {% endcomment %}
+
+    </div>
+
+  </template>
+
+  <script>
+    const app = Vue.createApp({
+      template: '#app-template',
+
+      components: {Item, Dropdown},
+
+      mounted() {
+        document.addEventListener('mouseup', ev=>{
+          this.on_mousemove = null
+          if (this.on_mouseup) {this.on_mouseup(ev)}
+        })
+        document.addEventListener('mousemove', ev=>{
+          if (this.on_mousemove) {this.on_mousemove(ev)}
+        })
+        this.user_uuid = window.localStorage.getItem('uuid')
+        this.fetch_imgs()
+      },
+
+      setup() {
+        return {
+          uizoom,
+          change_uizoom,
+          display_paper,
+          display_size,
+          display_size_long,
+          display_autocolor,
+          display_autocolor_long,
+          eq_size,
+        }
+      },
+
+      data() {return{
+        on_mousemove: null,
+        on_mouseup: null,
+
+        selecting: false,
+        selected: [],
+        last_clicked: null,
+        dropping: false,
+        dragselecting: false,
+        itemRefs: [],
+        uploading: [],
+        uploading_item: null,
+        user_uuid: null,
+
+        size: [[102,152],[152,210],[203,305],[305,420],[305,450]],
+        paper: ['G','L'],
+        autocolor: [0, 1],
+
+        items: [
+          /*{
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },
+          {
+            filename: 'SKY_8405.jpg',
+            q: 1,
+            crop: {width: '200%', left:'-55%', top: '-40%'},
+            paper: 'G',
+            size: [102, 152],
+          },
+          {
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },
+          {
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },
+          {
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },
+          {
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },
+          {
+            filename: 'SKY_0002.jpg',
+            q: 1,
+            crop: {width: '250%', left:'-75%', top: '-45%'},
+            paper: 'G',
+            size: [152, 102],
+          },*/
+        ],
+      } },
+
+      computed: {
+        some_too_small() {
+          return this.items.find(item => img_too_small(item))
+        },
+
+        selected_items_paper() {
+          return this.selected.map(i=>i.paper).reduce((m,i)=>{
+            if (m && m == i) {return m}
+            return false
+          }) || 'бумага?'
+        },
+
+        selected_items_size() {
+          return this.selected.map(i=>i.size).reduce((m,i)=>{
+            if (m && eq_size(m,i)) {return m}
+            return false
+          }) || '??x??'
+        },
+
+        selected_items_autocolor() {
+          const valid = [undefined, 0, 1]
+
+          const res = this.selected.map(i=>i.autocolor).reduce((m,i)=>{
+            if (valid.includes(m) && valid.indexOf(m)%2 == valid.indexOf(i)%2) {return m}
+            return false
+          })
+
+          return valid.includes(res) ? res : 'цветокор.?'
+        },
+      },
+
+      methods: {
+        duplicate_item(item) {
+          //console.log('dupe item', item)
+          const new_item = {}
+
+          for (let k in item) {
+            if (k == 'crop') {new_item.crop = {...item.crop} }
+            else if (k == 'size') {new_item.size = [...item.size]}
+            else if (k == 'selected') {}
+            else {new_item[k] = item[k]}
+          }
+
+          const index = this.items.findIndex(i=>i==item)
+          this.items.splice(index+1, 0, new_item)
+        },
+
+        duplicate_selected() {
+          this.selected.forEach(item=>{
+            this.duplicate_item(item)
+          })
+        },
+
+        set_selected_items_size(size) {
+          this.selected.forEach(item=>set_size(size, item))
+        },
+
+        set_selected_items_paper(paper) {
+          this.selected.forEach(item=>item.paper=paper)
+        },
+
+        set_selected_items_autocolor(value) {
+          this.selected.forEach(item=>item.autocolor=value)
+        },
+
+        fetch_imgs() {
+
+          const uuid = this.check_user_uuid()
+
+          if (uuid) {
+
+            const items = this.items
+
+            fetch('{% url "user_imgs" %}', {
+              method: 'POST',
+              headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({uuid})
+            }).then(res => res.json()).then(data => {
+              if (data.status == 'OK') {
+                data.items.forEach(item => {
+                  items.push(item)
+                })
+              }
+            })
+
+          }
+
+        },
+
+        upload_img() {
+          if (!this.uploading.length) {return}
+          if (this.uploading_item) {return}
+
+          const item = this.uploading.find(item => item.uploading && item.uploading.xhr === null)
+          if (!item) {
+            console.log('item for uploading is not found')
+            return
+          }
+          const uploading = item.uploading
+          const items = this.uploading.filter(item => item.uploading == uploading)
+          this.uploading_item = item
+
+          this.get_user_uuid().then(uuid => {
+
+            upload_file(item.file, {
+              uuid: uuid,
+              width: item.naturalWidth,
+              height: item.naturalHeight,
+              asp: item.asp,
+              timestamp: item.timestamp,
+              path: item.path,
+              filename: item.filename,
+            }, xhr => {
+              uploading.xhr = xhr
+            }, progress_event => {
+              //console.log('progress', floatFormat(100*progress_event.loaded/progress_event.total))
+              uploading.done = floatFormat(100*progress_event.loaded/progress_event.total)
+            }, abort_event => {
+              //console.log('on abort', abort_event)
+            }).then(res => {
+              //console.log('upload file res', res)
+              if (res.status == 'OK')
+                items.forEach(item => {
+                  item.src = res.item.src
+                  delete item.dataURL
+                  delete item.uploading
+                })
+            }).catch(err => {
+              console.error('upload file err', err)
+              uploading.error = err
+            }).finally(() => {
+              uploading.xhr = false
+              this.uploading_item = null
+              this.uploading = this.uploading.filter(item => {
+                return !items.includes(item)
+              })
+              this.upload_img()
+            })
+
+          })
+
+        },
+
+        ondrop(ev) {
+          //ev.preventDefault()
+          this.dropping = false
+
+          const items = this.items
+          const uploading = this.uploading
+          const upload_img = this.upload_img
+          const timestamp = Date.now()
+
+          function handleFile(entry) {
+            //console.log('file entry', entry)
+            entry.file(file => {
+
+              //console.log('file', file)
+              const reader = new FileReader()
+              reader.onload = () => {
+                //console.log('reader', reader)
+                //console.log('result', reader.result)
+
+                const img = new Image
+
+                img.onload = () => {
+                  //console.log('img onload', img)
+                  //console.log('img sizes', img.naturalWidth, img.naturalHeight, img.width, img.height)
+
+                  const asp = img.width / img.height
+                  const size = asp > 1 ? [152, 102] : [102, 152]
+                  const page_asp = size[0] / size[1]
+
+                  const item = {
+                    // obj
+                    entry,
+                    file,
+                    // simple
+                    filename: file.name,
+                    path: entry.fullPath || file.webkitRelativePath,
+                    timestamp,
+                    dataURL: reader.result,
+                    q: 1,
+                    paper: 'L',
+                    asp,
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    // list
+                    size,
+                    // dict
+                    crop: {left: '0%', top:'0%', width: '100%'},
+                    uploading: {xhr: null, done: 0},
+                  }
+
+                  cover(item)
+
+                  items.push(item)
+                  uploading.push(item)
+                  upload_img()
+                }
+
+                img.src = reader.result
+
+              }
+              reader.readAsDataURL(file)
+            }, err => {
+              console.log('file read error', err)
+            })
+          }
+
+          function handleEntry(entry, handleFile) {
+            if (entry.isFile) {handleFile(entry)}
+            else if (entry.isDirectory) {
+              entry.createReader().readEntries(entries => {
+                entries.forEach(entry => handleEntry(entry, handleFile))
+              })
+            }
+          }
+
+          if (ev.dataTransfer.items) {
+            ;[...ev.dataTransfer.items].forEach(item=>{
+              const entry = item.webkitGetAsEntry()
+              handleEntry(entry, handleFile)
+            })
+          } else {
+            console.log('files', ev.dataTransfer.files)
+          }
+        },
+
+        // TODO delete
+        ondragover(ev) {
+          ev.preventDefault()
+          //console.log('dragover', ev)
+        },
+
+        event(ev) {
+          console.log('event', ev)
+        },
+
+        ondragenter(ev) {
+          this.dropping = true
+        },
+
+        ondragleave(ev) {
+          this.dropping = false
+        },
+
+        set_mousemove(on_mousemove, on_mouseup=null) {
+          this.on_mousemove = on_mousemove
+          this.on_mouseup = on_mouseup
+          //document.addEventListener('mousemove', this.on_mousemove)
+        },
+
+        img_mousedown(item, event) {
+          //console.log('img_mousedown')
+          const last_clicked = this.last_clicked
+          this.last_clicked = item
+
+          if (event.shiftKey && last_clicked) {
+
+            const index1 = this.items.findIndex(i=>i==item)
+            const index2 = this.items.findIndex(i=>i==last_clicked)
+            const indexMin = Math.min(index1, index2)
+            const indexMax = Math.max(index1, index2)
+
+            this.items.slice(indexMin, indexMax+1).forEach(i=>i.selected=last_clicked.selected)
+
+          } else if (event.ctrlKey || this.selecting) {
+
+            item.selected = !item.selected
+
+          } else {
+
+            this.selected.forEach(i=>i.selected=false)
+            item.selected = true
+
+          }
+
+          this.selected = this.items.filter(i=>i.selected)
+        },
+
+        unselect_all() {
+          this.selected.forEach(i=>i.selected=false)
+          this.selected = []
+        },
+
+        cancel_selecting() {
+          this.selected.forEach(i=>i.selected=false)
+          this.selected = []
+          this.selecting = false
+          this.last_clicked = null
+        },
+
+        select_all() {
+          if (this.items.every(i=>i.selected)) {
+            this.items.forEach(i=>i.selected=false)
+            this.selected = []
+          } else {
+            this.items.forEach(i=>{
+              if (i.selected) {return}
+              i.selected = true
+              this.selected.push(i)
+            })
+          }
+        },
+
+        cover_selected() {
+          this.selected.forEach(cover)
+        },
+
+        fitin_selected() {
+          this.selected.forEach(fitin)
+        },
+
+        turn_selected() {
+          this.selected.forEach(turn_page)
+        },
+
+        workspace_mousedown(event) {
+          if (!this.selecting) {this.unselect_all()}
+
+          const x = event.x
+          const y = event.y
+          let dragselecting = false
+
+          this.set_mousemove(ev => {
+            if (dragselecting) {return}
+
+            if (Math.hypot(ev.x - x, ev.y - y) > 5) {
+              dragselecting = true
+
+              const box = this.$refs.select_box
+              const container = this.$refs.items_zone
+              const rect = container.getBoundingClientRect()
+              //const st0 = container.scrollTop
+              //const mt = rect.y
+              const s0 = container.scrollTop
+              const x0 = x - rect.x
+              //const y0 = y - mt + st0
+              const y0 = y
+
+              const coords = this.itemRefs.map(item => {
+                const r = item.$el.querySelector('.item_page').getBoundingClientRect()
+
+                return [item.$props.item, {
+                  l: r.x - rect.x,
+                  t: r.y,
+                  r: r.right - rect.x,
+                  b: r.bottom,
+                }]
+              })
+
+              this.set_mousemove(ev => {
+                const rect = container.getBoundingClientRect()
+                const x1 = ev.x - rect.x
+                //const y1 = ev.y - mt + container.scrollTop
+                const y1 = ev.y - s0 + container.scrollTop
+
+                const t = Math.min(y1, y0)
+                const l = Math.min(x1, x0)
+                const w = Math.abs(x1 -x0)
+                const h = Math.abs(y1 -y0)
+
+                box.style.top = t + 'px'
+                box.style.left = l + 'px'
+                box.style.width = w + 'px'
+                box.style.height = h + 'px'
+
+                //const t2 = t -st0 +mt
+
+                this.selected = []
+                coords.forEach(([item, box]) => {
+                  if (l > box.r || t > box.b || l+w < box.l || t+h < box.t) {
+                    item.selected = false
+                  } else {
+                    item.selected = true
+                    this.selected.push(item)
+                  }
+                })
+              }, ev => {
+                dragselecting = false
+                box.style.top = '0px'
+                box.style.left = '0px'
+                box.style.width = '0px'
+                box.style.height = '0px'
+              })
+
+            }
+
+          })
+
+        },
+
+        check_user_uuid() {
+          const uuid = window.localStorage.getItem('uuid')
+          this.user_uuid = uuid
+          return uuid
+        },
+
+        get_user_uuid() {
+          if (this.user_uuid) {return Promise.resolve(this.user_uuid)}
+
+          const uuid = this.check_user_uuid()
+
+          if (uuid) {return Promise.resolve(uuid)}
+
+          return new Promise((donw, fail) => {
+            fetch("{% url 'get_uuid' %}").then(r=>r.json()).then(d=>{
+              const uuid = d.uuid
+              window.localStorage.setItem('uuid', uuid)
+              this.user_uuid = uuid
+              done(uuid)
+            })
+          })
+        },
+      },
+    })
+    app.config.compilerOptions.delimiters = ['[[',']]']
+    app.mount('#app')
+  </script>
+  <!--//APP-->
+{% endblock js %}
+
+{% block content %}
+  <div id="app"></div>
+{% endblock content %}
+
+{% block modal %}
+  <div id="modal_trg" class="position-fixed start-0 top-0" style="z-index:9000;"></div>
+{% endblock modal %}

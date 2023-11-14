@@ -1,0 +1,191 @@
+<template id='foto-template'>
+  <div class="col-12 col-xl-6">
+    <div class="border rounded shadow my-2 p-2 pb-0" style="background-color:white;">
+
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted">[[ img.img ]]</span>
+        <button class="btn-close"></button>
+      </div>
+
+      <div class="row gx-2">
+        <!--IMG-->
+        <div class="col-12 col-sm-4 mb-2">
+          <!--CROPPER-->
+          <div class="cropper position-relative user-select-none border border-primary"
+            :style="{aspectRatio:img.selected_print.fit=='contain'?asp(img.selected_print):''}"
+            style='box-sizing:content-box;'
+          >
+            <!--IMG-->
+            <img ref='img' :src="img.img" class="w-100 h-100" :class="{[`object-fit-${img.selected_print.fit}`]:true}">
+            <!--overlay-->
+            <div class="position-absolute overflow-hidden top-0 start-0 w-100 h-100">
+              <div class="position-absolute"
+                :style="{left:`${img.selected_print.x}%`,top:`${img.selected_print.y}%`, aspectRatio:asp(img.selected_print), width:`${img.selected_print.w}%`}"
+              >
+                <div class="position-absolute"
+                  style="width:500px;height:1500px;left:-500px;top:-500px;background-color:rgba(0,0,0,.5);"
+                ></div>
+                <div class="position-absolute"
+                  style="width:100%;height:500px;left:0;bottom:-500px;background-color:rgba(0,0,0,.5);"
+                ></div>
+                <div class="position-absolute"
+                  style="width:100%;height:500px;left:0;top:-500px;background-color:rgba(0,0,0,.5);"
+                ></div>
+                <div class="position-absolute"
+                  style="width:500px;height:1500px;right:-500px;top:-500px;background-color:rgba(0,0,0,.5);"
+                ></div>
+              </div>
+            </div>
+            <!--CONTROLS-->
+            <div ref='ctrl' class="position-absolute"
+              style="cursor:move;"
+              :style="{left:`${img.selected_print.x}%`, top:`${img.selected_print.y}%`, aspectRatio:asp(img.selected_print), width:`${img.selected_print.w}%`}"
+              @mousedown.self="move($event, img.selected_print)"
+            >
+              <div class="cropper-scale-handle position-absolute rounded-circle"
+                style="width:16px;height:16px;right:-8px;bottom:-8px;cursor:nwse-resize;"
+                @mousedown.self="scale"
+              ></div>
+            </div>
+
+          </div>
+        </div>
+        <!--PRINTS-->
+        <div class="col-12 col-sm-8">
+          <div class="">
+            <!--add preset-->
+            <div class="input-group input-group-sm flex-nowrap mb-2">
+              <button class="btn btn-success" type="button" data-bs-toggle="dropdown"><i class="bi bi-plus-lg"></i></button>
+              <ul class="dropdown-menu">
+                <li><a href="#" class="dropdown-item">10x15</a></li>
+                <li><a href="#" class="dropdown-item">15x20</a></li>
+                <li><a href="#" class="dropdown-item">15x21</a></li>
+                <li><a href="#" class="dropdown-item">15x23</a></li>
+                <li><a href="#" class="dropdown-item">20x30</a></li>
+              </ul>
+              <button @click='add_print(size[0],"L")' class="btn btn-success">[[ display_size(size[0]) ]]</button>
+              <button @click='add_print(size[1],"L")' class="btn btn-success">[[ display_size(size[1]) ]]</button>
+            </div>
+            <!--print items-->
+            <div v-for="(i, idx) in prints_sorted(img.prints)"
+              :key="idx"
+              class="input-group input-group-sm flex-nowrap mb-2"
+              @click.capture='select_print(i)'
+            >
+              <button v-if='i==img.selected_print' class="btn btn-primary">[[ display_size(i.size) ]]</button>
+              <span v-else class="input-group-text user-select-none text-muted" style="cursor:pointer;">[[ display_size(i.size) ]]</span>
+              <Toggle v-model='i.dir' :choices='dir' :display='display_dir'></Toggle>
+              <Toggle v-model='i.paper' :choices='paper' :display='display_paper'></Toggle>
+              <Toggle v-model='i.fit' :choices='fit' :display='display_fit'></Toggle>
+              <Numinput v-model='i.q'></Numinput>
+              <button class="btn btn-secondary"><i class="bi bi-x-lg"></i></button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="progress mb-2" style="height:2px;">
+        <div class="progress-bar" style="width:23%;"></div>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<script>
+  const Foto = {
+    template: '#foto-template',
+    components: {Toggle, Numinput},
+    props: ['img','size','paper','fit','dir','setmousemove'],
+    watch: {
+      'img.selected_print.dir'(newValue, oldValue) {
+        const img = this.$refs.img
+        const print = this.img.selected_print
+
+        let w =  print.w / cropasp(print.size, oldValue)
+        const max_w = maxw(
+          img.width/img.height,
+          cropasp(print.size, newValue),
+          print.x,
+          print.y
+        )
+        print.w = clip(0, max_w, w)
+      },
+      'img.selected_print.fit'(newValue, oldValue) {
+        // NOTE contnue here
+      },
+    },
+    methods: {
+      add_print(sz,pp) {
+        const new_item = {size:sz,paper:pp,fit:this.fit[0],dir:this.dir[0],q:1,x:0,y:0,w:33}
+        this.img.prints.push(new_item)
+        this.img.selected_print = new_item
+      },
+
+      move(ev, print) {
+        const img = this.$refs.img
+        const img_w = img.width
+        const img_h = img.height
+        const x = ev.x
+        const y = ev.y
+        const x0 = print.x
+        const y0 = print.y
+        const asp = cropasp(print.size, print.dir)
+        const img_asp = img_w/img_h
+        const max_x = 100 - print.w
+        const max_y = maxy(img_asp, asp, print.w)
+
+        this.setmousemove(e => {
+          print.x = clip(0, max_x, x0 + (e.x-x)/img_w*100)
+          print.y = clip(0, max_y, y0 + (e.y-y)/img_h*100)
+        })
+      },
+
+      scale(ev) {
+        const bb = this.$refs.ctrl.getBoundingClientRect()
+        const w0d0 = this.img.selected_print.w / Math.hypot(ev.x-bb.x, ev.y-bb.y)
+        const img_asp = this.$refs.img.width / this.$refs.img.height
+        const crop_asp = cropasp(this.img.selected_print.size, this.img.selected_print.dir)
+        const max_w = maxw(img_asp, crop_asp, this.img.selected_print.x, this.img.selected_print.y)
+
+        this.setmousemove(e=>{
+          this.img.selected_print.w = clip(0, max_w, w0d0 * Math.hypot(e.x-bb.x, e.y-bb.y))
+        })
+      },
+
+      prints_sorted(prints) {
+        return prints.sort((a,b) => a.size[0]==b.size[0]?a.size[1]>b.size[1]:a.size[0]>b.size[0])
+      },
+
+      display_size(item) {
+        return `${Math.min(...item).toString().slice(0,2)}x${Math.max(...item).toString().slice(0,2)}`
+      },
+
+      display_fit(item) {
+        return `<span style='text-decoration:${({cover:'line-through', contain:'none'})[item]};'>поля</span>`
+        //return ({cover:'без полей', contain:'с полями'})[item]
+      },
+
+      display_paper(item) {
+        return ({G:'глянц.', L:'мат.'})[item]
+      },
+
+      display_dir(item) {
+        return `<i class="bi bi-${({hor:'card-image',ver:'file-person'})[item]}"></i>`
+        //return ({hor:'гор.',ver:'верт.'})[item]
+      },
+
+      eq_size(a,b){return a[0]==b[0]&&a[1]==b[1]},
+
+      select_print(print) {
+        //console.log('select_print')
+        this.img.selected_print = print
+      },
+
+      asp(print) {
+        return cropasp(print.size, print.dir)
+      },
+    },
+  }
+</script>

@@ -1,0 +1,13 @@
+.vscode
+__pycache__
+db.sqlite3
+run.cmd
+_gitignore
+Pipfile
+media/user_imgs/**
+media/ports/**
+media/orders/**
+media/blanks/**
+foto/migrations/**
+!foto/migrations/__init__.py
+

@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+  <div class="shadow-sm border-bottom">
+    <div class="container py-2">
+      <a href="#" class="btn rounded-pill">
+        <strong class="fs-2 text-secondary-emphasis">Фотопечать</strong>
+      </a>
+
+    </div>
+
+  </div>
+
+  <div class="container pt-3">
+    <a href="#" class="fs-2 btn text-primary rounded-pill">
+      Выбрать фотостудию&nbsp;
+      <i class="bi bi-printer"></i>
+    </a>
+
+    <a href="#" class="fs-2 btn text-primary rounded-pill">
+      Войти&nbsp;
+      {% comment %} <i class="bi bi-box-arrow-in-left"></i> {% endcomment %}
+      <i class="bi bi-door-open"></i>
+    </a>
+
+    <a href="#" class="fs-3 btn text-primary rounded-pill">
+      Зарегистрироваться&nbsp;
+      <i class="bi bi-person-plus"></i>
+    </a>
+  </div>
+
+
+  <div class="container">
+
+    <div>
+
+      {% for company in companies %}
+
+      <div>
+        <a href="{% url 'print' %}?studio={{company.id}}" class="btn btn-link fs-5">
+          <i class="bi bi-printer"></i>
+          {{ company.name }} @ {{ company.city }}, {{ company.address }}
+        </a>
+      </div>
+
+      {% endfor %}
+
+      <div>
+        <a href="#" class="btn btn-link fs-5">
+          <i class="bi bi-plus-circle"></i>
+          Добавить Фотосалон
+        </a>
+      </div>
+
+    </div>
+
+
+
+
+
+  </div>
+
+
+
+{% endblock content %}

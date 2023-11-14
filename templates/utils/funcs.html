@@ -1,0 +1,19 @@
+<script>
+  const clip = (a,b,x) => Math.min(Math.max(a,x),b)
+  const maxy = (img_asp, crop_asp, crop_w_prc) => {
+    return 100 * (1 - img_asp / crop_asp * crop_w_prc / 100)
+  }
+  const maxw = (img_asp, crop_asp, crop_x_prc, crop_y_prc) => {
+    return Math.min(
+      100 - crop_x_prc,
+      (100 - crop_y_prc) * crop_asp / img_asp
+    )
+  }
+  const cropasp = (size, dir='hor') => {
+    if (dir == 'hor') {
+      return Math.max(...size) / Math.min(...size)
+    } else {
+      return Math.min(...size) / Math.max(...size)
+    }
+  }
+</script>
