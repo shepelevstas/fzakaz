@@ -8,12 +8,12 @@
   </div>
 
   <div>
-    <div class="port d-inline-block position-relative border" style="aspect-ratio:102/152;width:100px;">
-      <img src="/media/ports/mini/SKY_0002.jpg" data-src="/media/ports/SKY_0002.jpg" class="position-absolute w-100">
+    <div class="port d-inline-block position-relative border overflow-hidden" style="aspect-ratio:102/152;width:100px;">
+      <img src="/media/ports/mini/SKY_0002.jpg" data-src="/media/ports/SKY_0002.jpg" class="position-absolute" style="width:147%;left:8.3%;top:5.57%;">
     </div>
 
-    <div class="port d-inline-block position-relative border" style="aspect-ratio:102/152;width:100px;">
-      <img src="/media/ports/mini/SKY_0006.jpg" data-src="/media/ports/SKY_0006.jpg" class="position-absolute w-100">
+    <div class="port d-inline-block position-relative border overflow-hidden" style="aspect-ratio:102/152;width:100px;">
+      <img src="/media/ports/mini/SKY_0006.jpg" data-src="/media/ports/SKY_0006.jpg" class="position-absolute" style="width:147%;left:8.3%;top:5.57%;">
     </div>
   </div>
 {% endblock content %}
@@ -23,19 +23,20 @@
     const {Application, Container, Texture, Sprite, Graphics} = PIXI
     const app = new Application()
     const stage = app.stage
+    stage.scale.set(0.2)
     document.body.appendChild(app.view)
 
 
 
     const outsidecontainer = new Container()
     outsidecontainer.setParent(stage)
-    outsidecontainer.scale.set(0.2)
+    //outsidecontainer.scale.set(0.2)
     outsidecontainer.position.set(100)
     outsidecontainer.alpha = 0.25
 
     const container = new Container()
     container.setParent(stage)
-    container.scale.set(0.2)
+    //container.scale.set(0.2)
     container.position.set(100)
 
     const width_px = 102 * 300 / 25.4
