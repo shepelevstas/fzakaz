@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from django.conf.urls.static import static
 
 from foto import views
@@ -19,6 +19,9 @@ urlpatterns = [
     path('money_table/<str:sh>_<int:year><str:group>:<str:code>/', views.money_table, name='money_table'),
 
     path('download_orders/<str:sh_cls>:<str:code>/', views.download_orders, name='download_orders'),
+
+    # kadr
+    path('kadr/', include('kadr.urls')),
 
     path('admin/', admin.site.urls),
 ]

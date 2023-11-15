@@ -1,0 +1,108 @@
+{% extends 'kadr/base.html' %}
+
+{% load static %}
+
+{% block content %}
+  <div class="container">
+    <h4>Кадрирование</h4>
+  </div>
+
+  <div>
+    <div class="port d-inline-block position-relative border" style="aspect-ratio:102/152;width:100px;">
+      <img src="/media/ports/mini/SKY_0002.jpg" data-src="/media/ports/SKY_0002.jpg" class="position-absolute w-100">
+    </div>
+
+    <div class="port d-inline-block position-relative border" style="aspect-ratio:102/152;width:100px;">
+      <img src="/media/ports/mini/SKY_0006.jpg" data-src="/media/ports/SKY_0006.jpg" class="position-absolute w-100">
+    </div>
+  </div>
+{% endblock content %}
+
+{% block js %}
+  <script>
+    const {Application, Container, Texture, Sprite, Graphics} = PIXI
+    const app = new Application()
+    const stage = app.stage
+    document.body.appendChild(app.view)
+
+
+
+    const outsidecontainer = new Container()
+    outsidecontainer.setParent(stage)
+    outsidecontainer.scale.set(0.2)
+    outsidecontainer.position.set(100)
+    outsidecontainer.alpha = 0.25
+
+    const container = new Container()
+    container.setParent(stage)
+    container.scale.set(0.2)
+    container.position.set(100)
+
+    const width_px = 102 * 300 / 25.4
+    const height_px = 152 * 300 / 25.4
+
+    const page_mask = new Graphics()
+    page_mask.beginFill(0xff0000).drawRect(0,0,width_px,height_px).endFill().setParent(container)
+
+    const page = new Graphics()
+    page.beginFill(0xffffff).drawRect(0,0,width_px,height_px).endFill().setParent(container)
+
+
+    // Sprites Storage
+    const textures = {}
+    const sprites = {}
+    let cur_spr = false
+    let cur_spr2 = false
+
+    const getTex = src => {
+      if (src in textures) {
+        return textures[src]
+      }
+      textures[src] = Texture.from(src)
+      return textures[src]
+    }
+
+    const getSpr = (src, inst=1) => {
+      const sprites_key = src + inst
+      if (sprites_key in sprites) {return sprites[sprites_key]}
+      const tex = getTex(src)
+      const spr = sprites[sprites_key] = new Sprite(tex)
+      return spr
+    }
+
+    const setCurSpr = src => {
+      if (cur_spr) {
+        cur_spr.removeFromParent()
+        cur_spr = false
+      }
+      if (cur_spr2) {
+        cur_spr2.removeFromParent()
+        cur_spr2 = false
+      }
+      const spr = getSpr(src)
+      cur_spr = spr
+      cur_spr.scale.set(0.5)
+      cur_spr.position.set(100)
+      cur_spr.setParent(container)
+      cur_spr.mask = page_mask
+
+      const spr2 = getSpr(src, 2)
+      cur_spr2 = spr2
+      spr2.scale.set(0.5)
+      spr2.position.set(100)
+      spr2.setParent(outsidecontainer)
+    }
+
+    // Interaction
+    function port_click(e) {
+      setCurSpr(e.target.dataset.src)
+    }
+
+    const ports = document.querySelectorAll('.port img')
+    ports.forEach(port => {
+      port.addEventListener('click', port_click)
+    })
+
+
+  </script>
+{% endblock js %}
