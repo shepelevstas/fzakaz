@@ -547,9 +547,11 @@ def download_orders(request, sh_cls, code):
 
   for file in ORDERS.iterdir():
     if not file.is_file() or not file.name.endswith('.json'):continue
+    if not file.name.startswith(sh_cls):continue
     img = file.name.split('.')[0].split('_')[-1]
     data = read_order(file)
     content.append([
+      file.name,
       img,
       data['name'],
       f'{data["tel"]},{data["mail"]}',
