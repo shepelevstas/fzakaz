@@ -12,7 +12,7 @@ urlpatterns = [
     # http://83.220.168.4/4_1%D0%90:agBVmO1xRZTnMNNwoXg8UBidjXaAv8MSLV0TsdV_gmA/
     path('upload_blanks/7f094d61-bb45-4375-81fe-32fcbb383d5c/', views.upload_blanks, name='upload_blanks'),
 
-    path('manage_blanks/bdadc1ad-ebc6-4671-a990-5d223bf913d8/', views.manage_blanks, name='manage_blanks'),
+    path('manage_blanks/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_blanks, name='manage_blanks'),
 
     path('orders/3528ca60-28b5-49d1-8574-66897823a017/', views.orders, name='orders'),
 

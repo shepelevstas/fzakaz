@@ -1,8 +1,5 @@
-import os
-import json
 from uuid import uuid4
 from operator import itemgetter
-import pickle, json
 import shutil
 
 from django.http.response import HttpResponse
@@ -11,6 +8,11 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.core.signing import Signer, BadSignature
 from django.conf import settings
+
+from utils import log
+from utils.io import write_table, read_table, save_order, read_order
+from utils.trans import en, ru
+from utils.money import order_cost
 
 from .forms import ContactInfoForm, UploadBlanksForm
 
@@ -92,9 +94,7 @@ ROWS = [
   "f10",
 ]
 
-ru = str.maketrans('abcdefghijklmnopqrstuvwxyz', 'абцдефгхижклмнопэрстувшхуз')
-
-en = str.maketrans('абцдефгхижклмнопэрстувшхуз', 'abcdefghijklmnopqrstuvwxyz')
+signer = Signer()
 
 
 def signed_view(request, sh, year, group, code):
@@ -132,30 +132,6 @@ def signed_view(request, sh, year, group, code):
   return zakaz(request, sh, cls, uuid)
 
 
-def read_order(pathlib_file, format='json'):
-  if format in ('pkl', 'pickle'):
-    with pathlib_file.open('rb') as f:
-      return pickle.load(f)
-
-  elif format == 'json':
-    with pathlib_file.open('r', encoding='utf8') as f:
-      return json.load(f)
-
-  raise ValueError('format must be json|pkl|pickle')
-
-
-def save_order(pathlib_file, obj, format='json'):
-  if format in ('pkl', 'pickle'):
-    with pathlib_file.open('wb') as f:
-      return pickle.dump(obj, f)
-
-  elif format == 'json':
-    with pathlib_file.open('w', encoding='utf8') as f:
-      return json.dump(obj, f, ensure_ascii=False)
-
-  raise ValueError('format must be json|pkl|pickle')
-
-
 def zakaz(request, sh=None, cls=None, uuid=None):
   '''uuid like 7f094d61-bb45-4375-81fe-32fcbb383d5c'''
 
@@ -170,11 +146,15 @@ def zakaz(request, sh=None, cls=None, uuid=None):
       'classes': sorted([ i.name for i in (settings.MEDIA_ROOT / 'blanks' / sh).iterdir()], key=lambda i: int(i[:-1])*1000+ord(i[-1].upper())),
     })
 
+  ALBUM = settings.MEDIA_ROOT / 'blanks' / sh.upper() / cls.upper()
+
+  closed = (ALBUM / 'closed').is_file()
+
   if uuid is None:
     blanks = [{
       'uuid': i.name,
       'blk': next(i.iterdir()).name
-    } for i in (settings.MEDIA_ROOT / 'blanks' / sh / cls).iterdir()]
+    } for i in (settings.MEDIA_ROOT / 'blanks' / sh / cls).iterdir() if i.is_dir()]
 
     print('[s]', sh)
     print('[c]', cls)
@@ -364,6 +344,7 @@ def zakaz(request, sh=None, cls=None, uuid=None):
     "blank": f"/media/blanks/{sh.upper()}/{cls.upper()}/{uuid}/{imgname}",
     "contacts": contacts,
     "prices": PRICES,
+    "closed": closed,
   })
 
 
@@ -378,12 +359,37 @@ def orders(request):
 def upload_blanks(request, edit=False):
   form = UploadBlanksForm()
 
+  def load_album(ALBUM):
+    album = f'{ALBUM.parent.name}_{ALBUM.name}'
+    blanks_count = len([None for i in ALBUM.iterdir() if i.is_dir()])
+    closed = (ALBUM / 'closed').is_file()
+    ordered_count = 0
+    for o in ORDERS.iterdir():
+      if not o.name.startswith(f'{album}_'): continue
+      order = read_order(o)
+      if order_cost(order):
+        ordered_count += 1
+    return {
+      'name': album,
+      'sh': ALBUM.parent.name,
+      'cls': ALBUM.name,
+      'sign': signer.sign(album),
+      'blanks_count': blanks_count,
+      'ordered_count': ordered_count,
+      'order_progress': ordered_count / blanks_count * 100,
+      'closed': closed,
+    }
+
   if request.method == 'POST':
+    log('[ upload_blanks POST ]', request.POST)
     action = request.POST.get('action')
+    sh = cls = ALBUM = None
+    if 'link' in request.POST:
+      sh, cls = request.POST['link'].split(':')[0].split('_')
+      ALBUM = BLANKS / sh / cls
 
     if action == 'delete':
-      sh, cls = request.POST.get('link').split(':')[0].split('_')
-      trg = BLANKS / sh / cls
+      trg = ALBUM
       if trg.is_dir():
         shutil.rmtree(trg)
 
@@ -392,14 +398,14 @@ def upload_blanks(request, edit=False):
       if form.is_valid():
         sh = form.cleaned_data['sh'].upper()
         yr = form.cleaned_data["yr"]
-        gr = form.cleaned_data["gr"][0].lower()
-        gr = gr.translate(ru).upper()
+        gr = form.cleaned_data["gr"][0].lower().translate(ru).upper()
 
-        cls_dir = BLANKS / sh / f'{yr}{gr}'
-        cls_dir.mkdir(parents=True, exist_ok=True)
+        ALBUM = BLANKS / sh / f'{yr}{gr}'
+        ALBUM.mkdir(parents=True, exist_ok=True)
 
         existing_file_dirs = {}
-        for file_dir in cls_dir.iterdir():
+        for file_dir in ALBUM.iterdir():
+          if not file_dir.is_dir():continue
           for f in file_dir.iterdir():
             img = f.name.split('.')[0].split('_')[-1]
             existing_file_dirs[img] = [file_dir, f]
@@ -411,7 +417,7 @@ def upload_blanks(request, edit=False):
           if exist_file_dir:
             file_dir = exist_file_dir
           else:
-            file_dir = cls_dir / str(uuid4())
+            file_dir = ALBUM / str(uuid4())
             file_dir.mkdir()
           trg_file = file_dir / f'{sh}_{yr}{gr}_{img}.{ext}'
           if trg_file.exists():
@@ -420,25 +426,34 @@ def upload_blanks(request, edit=False):
             for ch in file.chunks():
               f.write(ch)
 
-  links = []
-  signer = Signer()
-  for sh in BLANKS.iterdir():
-    if not sh.is_dir():continue
-    for cls in sh.iterdir():
-      if not cls.is_dir():continue
-      links.append([
-        signer.sign(f'{sh.name}_{cls.name}'),
-        len([None for i in cls.iterdir() if i.is_dir()]),
-        sh.name,
-        cls.name,
-      ])
+      if request.POST.get('ajax') == 'true':
+        album_data = load_album(ALBUM)
+        return JsonResponse({'data': album_data})
 
-  links.sort(key=lambda i: i[0])
+    elif action == 'close':
+      log('[ CLOSE ]')
+      closed = ALBUM / 'closed'
+      closed.open('a').close()
+
+    elif action == 'open':
+      log('[ OPEN ]', ALBUM, ALBUM.is_dir())
+      closed = ALBUM / 'closed'
+      log('is file', closed.is_file())
+      if closed.is_file():
+        closed.unlink()
+
+  albums = []
+  for SH in BLANKS.iterdir():
+    if not SH.is_dir():continue
+    for ALBUM in SH.iterdir():
+      if not ALBUM.is_dir():continue
+      albums.append(load_album(ALBUM))
+  albums.sort(key=lambda d: d['name'])
 
   return render(request, 'upload_blanks.html', {
     'form': form,
-    'links': links,
     'edit': edit,
+    'albums': albums,
   })
 
 
@@ -448,7 +463,7 @@ def money_table(request, sh, year, group, code):
   cls = f'{year}{group.upper()}'
 
   try:
-    unsigned = Signer().unsign(sign)
+    unsigned = signer.unsign(sign)
 
   except BadSignature:
     return HttpResponse('Код неверный')

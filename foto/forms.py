@@ -7,7 +7,7 @@ class MultipleFileInput(forms.ClearableFileInput):
 
 class MultipleFileField(forms.FileField):
   def __init__(self, *args, **kwargs):
-    kwargs.setdefault('widget', MultipleFileInput())
+    kwargs.setdefault('widget', MultipleFileInput(attrs={'multiple': ''}))
     super().__init__(*args, **kwargs)
 
   def clean(self, data, initial=None):
@@ -42,8 +42,14 @@ class ContactInfoForm(forms.Form):
 
 class UploadBlanksForm(forms.Form):
   sh = forms.CharField(label='SH', required=True)
-  yr = forms.CharField(label='YR', required=True)
-  gr = forms.CharField(label='GR', required=True)
+  # yr = forms.CharField(label='YR', required=True)
+  yr = forms.ChoiceField(label="Год", required=True, choices=[
+    (i,i) for i in range(1,12)
+  ])
+  # gr = forms.CharField(label='GR', required=True)
+  gr = forms.ChoiceField(label="Класс", required=True, choices=[
+    (i, i) for i in 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ'
+  ])
   #files = forms.FileField(widget=forms.FileInput(attrs={'multiple': True, 'accept':'image/jpeg'}), required=True)
   files = MultipleFileField(required=True)
 
