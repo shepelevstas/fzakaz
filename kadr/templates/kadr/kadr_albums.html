@@ -3,12 +3,17 @@
 {% load static %}
 
 {% block content %}
+
   <div class="position-sticky top-0 shadow bg-white p-2">
-    <form action="." method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      {{form}}
-      <button type="submit" name="action" value="upload" class="btn btn-primary btn-sm">upload</button>
-    </form>
+    {% if form %}
+      <form action="." method="post" enctype="multipart/form-data" id="upload_form">
+        {% csrf_token %}
+        {{form}}
+        <button type="submit" name="action" value="upload" class="btn btn-primary btn-sm">upload</button>
+      </form>
+    {% elif username %}
+      {{username}}
+    {% endif %}
   </div>
 
   <table class="table table-sm bg-white">
@@ -16,201 +21,297 @@
       <th class="ps-2 ps-lg-4">альбом</th>
       <th class="text-center">имена</th>
       <th class="text-center">кадр.</th>
+      <th class="text-center pe-2 pe-lg-4">доступы</th>
     </thead>
 
     <tbody id="album_items">
-
       {% for i in data %}
-        <tr data-album="{{i.album}}" class="align-middle">
-          <td class="ps-2 ps-lg-4">
-            {{i.album}}
-            <a href="{{i.url_signed_kadr}}">Кадр</a>
-            <a href="{{i.url_signed_names}}">Имена</a>
-          </td>
-
-          <td class="item_name text-center">
-            <span class="item_done">{{i.names_done}}</span>
-            <div class="progress rounded-pill" style="height:10px;">
-              <div class="item_progress progress-bar {% if i.names_progress < 100 %}bg-warning{% endif %}" style="width: {{i.names_progress}}%;"></div>
-            </div>
-          </td>
-
-          <td class="item_kadr text-center pe-2 pe-lg-4">
-            <span class="item_done">{{i.kadr_done}}</span>
-            <div class="progress rounded-pill" style="height:10px;">
-              <div class="item_progress progress-bar {% if i.kadr_progress < 100 %}bg-warning{% endif %}" style="width: {{i.kadr_progress}}%;"></div>
-            </div>
-          </td>
-        </tr>
+        {% include 'kadr/parts/kadr_albums_line.html' %}
       {% endfor %}
+      {% if role == 'super' %}
+        <!-- UPLOAD LINE -->
+        <tr id="new_line"></tr>
+        <tr class="align-middle" id="upload_line">
+          <td class="ps-2 ps-lg-4">
+            <input type="text" class="form-control form-control-sm shadow-sm" form="album_upload_form" name="album" required>
+          </td>
 
+          <td colspan="2" class="text-center">
+            <label for="upload_files" class="btn badge text-bg-warning rounded-pill">Выбрать файлы</label>
+            <input class="d-none" type="file" multiple id="upload_files" form="album_upload_form" name="files" required>
+          </td>
+
+          <td class="pe-2 pe-lg-4">
+            <form action="." id="album_upload_form" class="text-center"
+              hx-post="{{request.path}}"
+              hx-encoding='multipart/form-data'
+              hx-swap="outerHTML"
+            >
+              <input type="hidden" name="offer">
+
+              {% for item in items %}
+
+                <div class="d-inline-flex">
+                  <span class="btn badge text-bg-primary rounded-pill rounded-end-0">{{item.ru}}</span>
+
+                  <span class="btn badge text-bg-success rounded-pill rounded-start-0 dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">Открыть</span>
+
+                  <ul class="dropdown-menu shadow">
+                    {% for group in groups %}
+
+                      <li><span class="dropdown-item-text">{{group.ru}}</span></li>
+
+                      {% for mi in group.menu %}
+                        <li><a href="#" class="dropdown-item" data-toggle-upload-offer="add,{{group.name}},{{item.name}},{{mi.name}}">
+                          <i class="pe-2 bi bi-circle text-black-50"></i>
+                          {{mi.ru}}
+                        </a></li>
+                      {% endfor %}
+
+                      {% if not forloop.last %}
+                        <li><hr class="dropdown-divider"></li>
+                      {% endif %}
+                    {% endfor %}
+                  </ul>
+                </div>
+
+              {% endfor %}
+
+              <button class="btn badge btn-primary rounded-pill" name="action" value="upload">
+                <i class="bi bi-upload pe-1"></i>&nbsp;Upload</button>
+            </form>
+          </td>
+
+        </tr>
+      {% endif %}
     </tbody>
   </table>
 
+  {% if form %}
   <div id="upload_bar" class="position-fixed bottom-0 bg-white shadow shadow-lg w-100 p-2" style="transition:transform .5s;transform:translatey(100%);">
     <div class="progress rounded-pill">
       <div class="progress-bar" style="width: 0%;"></div>
     </div>
   </div>
+  {% endif %}
 {% endblock content %}
 
+{% block js_libs %}
+  {{ block.super }}
+  <script src="/static/js/htmx199.min.js"></script>
+  {% if form %}<script src="/static/upq.js"></script>{% endif %}
+{% endblock js_libs %}
+
 {% block js %}
-  <script src="/static/upq.js"></script>
+  <!-- HTMX config -->
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const bar = document.querySelector('#upload_bar')
-      const showBar = () => {bar.style.transform = 'none'}
-      const hideBar = () => {bar.style.transform = 'translatey(100%)'}
-      const setValue = value => {
-        bar.querySelector('.progress .progress-bar').style.width = `${value*100}%`
-      }
-
-      const upq = window.upq = new UploadQue({
-        url: '{% url "kadr_albums" user %}',
-        formAdditionalFields: {
-          csrfmiddlewaretoken: '{{ csrf_token }}',
-          action: 'upload',
-          ajax: 'true',
-        },
-        formFilefieldName: 'files',
-        add:(item) => {
-
-          const total_count = upq.que.length
-          const done_count = upq.que.filter(i => i.status === 'done').length
-          const one_file_share = 100 / total_count
-          const uploading_item = upq.que.find(i => i.status === 'uploading')
-          let value = 0
-          if (uploading_item) {
-            value = one_file_share * (done_count + uploading_item.done / 100) / 100
-          } else {
-            value = one_file_share * done_count / 100
-          }
-
-          showBar()
-          setValue(value)
-
-        },
-        progress:(item, event) => {
-
-          const total_count = upq.que.length
-          const done_count = upq.que.filter(i => i.status === 'done').length
-          const one_file_share = 100 / total_count
-          const value = one_file_share * (done_count + item.done / 100) / 100
-
-          setValue(value)
-
-        },
-        load:(item, event) => {
-
-          let data_list = null
-          try {
-            const response_json = JSON.parse(event.target.responseText)
-            if (response_json.data_list) {
-              data_list = response_json.data_list
-            }
-          } catch (error) {
-            console.error(error)
-          }
-          if (data_list) {
-            updateAlbums(data_list)
-          }
-
-          const total_count = upq.que.length
-          const done_count = upq.que.filter(i => i.status === 'done').length
-          const todo_count = total_count - done_count
-          if (todo_count === 0) {
-            upq.que = []
-            hideBar()
-            //window.location.reload()
-          } else {
-            console.log('more todo', todo_count)
-          }
-
-        },
-      })
-
-      function renderLine(data) {
-        const tr = document.createElement('TR')
-        tr.dataset.album = data.album
-        tr.classList.add('align-middle')
-        tr.innerHTML = `
-          <td class="ps-2 ps-lg-4">
-            ${data.album}
-            <a href="${data.url_signed_kadr}">Кадр</a>
-            <a href="${data.url_signed_names}">Имена</a>
-          </td>
-
-          <td class="item_name text-center">
-            <span class="item_done">${data.names_done}</span>
-            <div class="progress rounded-pill" style="height:10px;">
-              <div class="item_progress progress-bar ${data.names_progress<100?'bg-warning':''}" style="width: ${data.names_progress}%;"></div>
-            </div>
-          </td>
-
-          <td class="item_kadr text-center pe-2 pe-lg-4">
-            <span class="item_done">${data.kadr_done}</span>
-            <div class="progress rounded-pill" style="height:10px;">
-              <div class="item_progress progress-bar ${data.kadr_progress<100?'bg-warning':''}" style="width: ${data.kadr_progress}%;"></div>
-            </div>
-          </td>
-        `
-        return tr
-      }
-
-      function updateAlbums(data_list) {
-        /* data::{
-            album 'TEST'
-            kadr_done '0 / 3'
-            kadr_progress 33
-            names_done
-            names_progress
-          }
-        */
-        data_list.forEach(data => {
-          const line = document.querySelector(`tr[data-album='${data.album}']`)
-          if (line) {
-            line.querySelector('td.item_name .item_done').textContent = data.names_done
-
-            line.querySelector('td.item_name .item_progress').style.width = `${data.names_progress}%`
-
-            if (data.names_progress<100) {
-              line.querySelector('td.item_name .item_progress').classList.add('bg-warning')
-            } else {
-              line.querySelector('td.item_name .item_progress').classList.remove('bg-warning')
-            }
-
-            line.querySelector('td.item_kadr .item_done').textContent = data.kadr_done
-
-            line.querySelector('td.item_kadr .item_progress').style.width = `${data.kadr_progress}%`
-
-            if (data.kadr_progress<100) {
-              line.querySelector('td.item_kadr .item_progress').classList.add('bg-warning')
-            } else {
-              line.querySelector('td.item_kadr .item_progress').classList.remove('bg-warning')
-            }
-
-          } else {
-            const new_line = renderLine(data)
-            document.querySelector('tbody#album_items').appendChild(new_line)
-          }
-        })
-      }
-
-      document.querySelector('form[method="POST"]').addEventListener('submit', function(e) {
-        e.preventDefault()
-        const form = e.target
-        const input_files = form.querySelector('input[type="file"][name="files"]')
-        const input_album = form.querySelector('input[type="text"][name="album"]')
-        const album = input_album.value
-        const files = input_files.files
-
-        //Array.from(files).forEach(file => {
-        //  upq.add(file, {album})
-        //})
-        upq.addFiles(files, {album})
-
-        input_files.value = ''
-      })
+    document.body.addEventListener('htmx:configRequest', e => {
+      console.log('[ detail ]', e.detail)
+      if (e.detail.verb === 'post')
+        e.detail.headers['X-CSRFToken'] = '{{ csrf_token }}'
     })
   </script>
+
+  <!-- UPLOAD upq -->
+  {% if form %}
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const bar = document.querySelector('#upload_bar')
+        const showBar = window.showBar = () => {bar.style.transform = 'none'}
+        const hideBar = window.hideBar = () => {bar.style.transform = 'translatey(100%)'}
+
+        const upq = window.upq = new UploadQue({
+          url: '{% url "kadr_albums" user %}',
+          headers: {'X-CSRFToken': '{{ csrf_token }}'},
+          fields: {action: 'upload', ajax: 'true'},
+          fileFieldName: 'files',
+          totalProgressElement: bar.querySelector('.progress .progress-bar'),
+
+          add() {
+            showBar()
+          },
+
+          done() {
+            this.clear()
+            hideBar()
+          },
+
+          load(item, event) {
+            let data_list = null
+            try {
+              const response_json = JSON.parse(event.target.responseText)
+              if (response_json.data_list) {
+                data_list = response_json.data_list
+              }
+            } catch (error) {
+              console.error(error)
+            }
+            if (data_list) {
+              updateAlbums(data_list)
+            }
+          },
+        })
+
+        function renderLine(data) {
+          const tr = document.createElement('TR')
+          tr.dataset.album = data.album
+          tr.classList.add('align-middle')
+          tr.innerHTML = `
+            <td class="ps-2 ps-lg-4">
+              ${data.album}
+              <a href="${data.url_signed_kadr}">Кадр</a>
+              <a href="${data.url_signed_names}">Имена</a>
+            </td>
+
+            <td class="item_name text-center">
+              <span class="item_done">${data.names_done}</span>
+              <div class="progress rounded-pill" style="height:10px;">
+                <div class="item_progress progress-bar ${data.names_progress<100?'bg-warning':''}" style="width: ${data.names_progress}%;"></div>
+              </div>
+            </td>
+
+            <td class="item_kadr text-center pe-2 pe-lg-4">
+              <span class="item_done">${data.kadr_done}</span>
+              <div class="progress rounded-pill" style="height:10px;">
+                <div class="item_progress progress-bar ${data.kadr_progress<100?'bg-warning':''}" style="width: ${data.kadr_progress}%;"></div>
+              </div>
+            </td>
+          `
+          return tr
+        }
+
+        function updateAlbums(data_list) {
+          /* data::{
+              album 'TEST'
+              kadr_done '0 / 3'
+              kadr_progress 33
+              names_done
+              names_progress
+            }
+          */
+          data_list.forEach(data => {
+            const line = document.querySelector(`tr[data-album='${data.album}']`)
+            if (line) {
+              line.querySelector('td.item_name .item_done').textContent = data.names_done
+
+              line.querySelector('td.item_name .item_progress').style.width = `${data.names_progress}%`
+
+              if (data.names_progress<100) {
+                line.querySelector('td.item_name .item_progress').classList.add('bg-warning')
+              } else {
+                line.querySelector('td.item_name .item_progress').classList.remove('bg-warning')
+              }
+
+              line.querySelector('td.item_kadr .item_done').textContent = data.kadr_done
+
+              line.querySelector('td.item_kadr .item_progress').style.width = `${data.kadr_progress}%`
+
+              if (data.kadr_progress<100) {
+                line.querySelector('td.item_kadr .item_progress').classList.add('bg-warning')
+              } else {
+                line.querySelector('td.item_kadr .item_progress').classList.remove('bg-warning')
+              }
+
+            } else {
+              const new_line = renderLine(data)
+              document.querySelector('tbody#album_items').appendChild(new_line)
+            }
+          })
+        }
+
+        document.querySelector('form#upload_form[method="POST"]').addEventListener('submit', (e) => {
+          e.preventDefault()
+          const form = e.target
+          const input_files = form.querySelector('input[type="file"][name="files"]')
+          const input_album = form.querySelector('input[type="text"][name="album"]')
+
+          const album = input_album.value
+          const files = input_files.files
+
+          upq.addFiles(files, {album})
+
+          input_files.value = ''
+        })
+      })
+    </script>
+  {% endif %}
+
+  <!-- HTMX UPLOAD -->
+  {% if form %}
+    <script>
+      const plural = (one, two, five) => (x) => {
+        const mod100 = x % 100
+        if ([12,13,14].includes(mod100)) {return five}
+        const mod10 = x % 10
+        if ([1].includes(mod10)) {return one}
+        if ([2,3,4].includes(mod10)) {return two}
+        return five
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const upload_offer = new Set()
+        upload_offer.add('add,roles,kadr,worker')
+        const menu_items = document.querySelectorAll('tr#upload_line a[data-toggle-upload-offer]')
+        const offer_input = document.querySelector('tr#upload_line input[name="offer"]')
+
+        const update_menu_items = () => {
+          menu_items.forEach(item => {
+            const i = item.querySelector('i')
+            if (upload_offer.has(item.dataset.toggleUploadOffer)) {
+              i.classList.add('bi-check-circle', 'text-primary')
+              i.classList.remove('bi-circle', 'text-black-50')
+            } else {
+              i.classList.remove('bi-check-circle', 'text-primary')
+              i.classList.add('bi-circle', 'text-black-50')
+            }
+          })
+          offer_input.value = Array.from(upload_offer).join(';')
+        }
+
+        update_menu_items()
+
+        menu_items.forEach(item => {
+          item.addEventListener('click', e => {
+            const value = item.dataset.toggleUploadOffer
+
+            if   (upload_offer.has(value))
+                 {upload_offer.delete(value)}
+            else {upload_offer.add(value)}
+
+            update_menu_items()
+          })
+        })
+
+        const plural_file = plural('файл', 'файла', 'файлов')
+        const files_input = document.querySelector('tr#upload_line input#upload_files[type="file"]')
+        const update_files_input = () => {
+          const count = files_input.files.length
+          const value = count
+            ? `${count} ${plural_file(count)}`
+            : 'Выбрать файлы'
+          document.querySelector('tr#upload_line label[for="upload_files"]').textContent = value
+        }
+        files_input.addEventListener('change', update_files_input)
+
+
+
+        const progressElement = document.querySelector('#upload_bar .progress .progress-bar')
+
+        const ups = []
+
+        htmx.on('form#album_upload_form', 'htmx:beforeSend', e => {
+          files_input.value = ''
+          update_files_input()
+          showBar()
+        })
+
+        htmx.on('form#album_upload_form', 'htmx:xhr:progress', e => {
+          const value = e.detail.loaded/e.detail.total*100
+          if (value >= 100) {hideBar()}
+          progressElement.style.width = `${value}%`
+        })
+      })
+    </script>
+  {% endif %}
+
 {% endblock js %}

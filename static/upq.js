@@ -2,28 +2,31 @@ class UploadQue {
   fileSymbol = Symbol('file')
   requestSymbol = Symbol('request')
   statusSymbol = Symbol('status')
+  que = []
 
   constructor(options={}) {
     this.options = options
-    this.formAdditionalFields = options['formAdditionalFields']||{}
-    this.formEnctype = options['formEnctype']||'multipart/form-data'
-    this.formFilefieldName = options['formFilefieldName']||'file'
+    this.formAdditionalFields = this.fields = options['formAdditionalFields'] || options['fields'] || {}
+    this.headers = options['headers']
+    this.formEnctype = this.enctype = options['formEnctype'] || options['enctype'] || 'multipart/form-data'
+    this.formFilefieldName = this.fileFieldName = options['fileFieldName'] = options['formFilefieldName'] || 'file'
     this.onProgress = options['progress'] || options['onProgress']
     this.onLoad = options['load'] || options['onLoad']
     this.onError = options['error'] || options['onError']
     this.onAbort = options['abort'] || options['onAbort']
     this.onAborted = options['aborted'] || options['onAborted']
-    this.uploadUrl = options['url'] || options['uploadUrl']
+    this.uploadUrl = this.url = options['url'] || options['uploadUrl']
     this.onAdd = options['add'] || options['onAdd']
-    this.onDeleted = options['onDeleted']
+    this.onDeleted = options['onDeleted'] || options['deleted']
     this.onStatusChange = options['statuschange'] || options['onStatusChange']
     this.onStop = options['onStop']
     this.onResume = options['onResume']
+    this.onAllDone = options['done']
     this.stopClick = options['stop']
     this.resumeClick = options['resume']
     this.deleteClick = options['delete']
     this.renderItem = options['renderItem']
-    this.que = []
+    this.totalProgressElement = options['totalProgressElement']
   }
 
   addFiles(files, moreFormFields) {
@@ -35,10 +38,13 @@ class UploadQue {
       done: 0,
     }
     if (moreFormFields) {
-      item.moreFormFields = moreFormFields
+      item.moreFormFields = item.fields = moreFormFields
     }
     this.que.push(item)
     if (this.onAdd) {this.onAdd(item)}
+    if (this.totalProgressElement) {
+      this.totalProgressElement.style.width = `${this.totalDone()}%`
+    }
     if (this.renderItem) {item.element = this.renderItem(item)}
     if (item.element) {
       const progress = item.element.querySelector('[data-upq-progress]')
@@ -61,9 +67,7 @@ class UploadQue {
       if (del) {
         item.deleteElement = del
         del.addEventListener('click', e => {
-          if (this.deleteClick) {
-            this.deleteClick(item, e)
-          }
+          if (this.deleteClick) {this.deleteClick(item, e)}
           this.delete(item)
         })
       }
@@ -82,10 +86,13 @@ class UploadQue {
     }
     item.name = file.name
     if (moreFormFields) {
-      item.moreFormFields = moreFormFields
+      item.moreFormFields = item.fields = moreFormFields
     }
     this.que.push(item)
     if (this.onAdd) {this.onAdd(item)}
+    if (this.totalProgressElement) {
+      this.totalProgressElement.style.width = `${this.totalDone()}%`
+    }
     if (this.renderItem) {item.element = this.renderItem(item)}
     if (item.element) {
       const progress = item.element.querySelector('[data-upq-progress]')
@@ -125,13 +132,16 @@ class UploadQue {
       console.log('que is empty')
       return
     }
-    if (this.que.some(i => i[this.statusSymbol] == 'uploading')) {
+    if (this.isUploading()) {
       console.log('already uploading')
       return
     }
-    const item = this.que.find(i => i[this.statusSymbol] == 'new')
+    const item = this.findStatus('new')
     if (!item) {
       console.log('no new items')
+      if (this.que.length === this.count_done() && this.onAllDone) {
+        this.onAllDone()
+      }
       return
     }
     console.log('upload!')
@@ -150,35 +160,63 @@ class UploadQue {
     item.status = value
   }
 
+  totalDone() {
+    if (this.que.length === 0) {return 0}
+
+    const one_file_percent = 100 / this.que.length
+    const cur_item = this.cur_item()
+
+    if (cur_item) {
+      return one_file_percent * (this.count_done() + cur_item.done / 100)
+    }
+
+    return one_file_percent * this.count_done()
+  }
+
   count_done() {
-    return this.que.filter(item=>item[this.statusSymbol]=='done').length
+    return this.que.filter(item=>item[this.statusSymbol]==='done').length
   }
 
   cur_item() {
-    return this.que.find(item=>item[this.statusSymbol]=='uploading')
+    return this.findStatus('uploading')
+  }
+
+  isUploading() {
+    return this.que.some(item => item[this.statusSymbol] === 'uploading')
+  }
+
+  isEmpty() {
+    return this.que.length === 0
+  }
+
+  clear() {
+    this.que = []
+  }
+
+  findStatus(status) {
+    return this.que.find(item => item[this.statusSymbol] === status)
   }
 
   upload(item) {
     this.setStatus(item, 'uploading')
     const form = new FormData()
-    form.enctype = this.formEnctype
-    for (let k in this.formAdditionalFields) {
-      form.set(k, this.formAdditionalFields[k])
+    form.enctype = this.enctype
+
+    for (let k in this.fields) {
+      form.set(k, this.fields[k])
     }
 
     if (this.fileSymbol in item) {
-      console.log('upload one file')
-      form.set(this.formFilefieldName, item[this.fileSymbol])
+      form.set(this.fileFieldName, item[this.fileSymbol])
     } else if ('files' in item) {
-      console.log('upload many files')
       Array.from(item.files).forEach(file => {
-        form.append(this.formFilefieldName, file)
+        form.append(this.fileFieldName, file)
       })
     }
 
-    if (item.moreFormFields) {
-      for (let k in item.moreFormFields) {
-        form.set(k, item.moreFormFields[k])
+    if (item.fields) {
+      for (let k in item.fields) {
+        form.set(k, item.fields[k])
       }
     }
 
@@ -194,6 +232,10 @@ class UploadQue {
         && item.progressElement
       ) {
         item.progressElement.innerText = `${value}%`
+      }
+
+      if (this.totalProgressElement) {
+        this.totalProgressElement.style.width = this.totalDone() + '%'
       }
     })
 
@@ -215,7 +257,12 @@ class UploadQue {
       this.step()
     })
 
-    req.open('POST', this.uploadUrl)
+    req.open('POST', this.url)
+    if (typeof(this.headers) === 'object') {
+      for (let k in this.headers) {
+        req.setRequestHeader(k, this.headers[k])
+      }
+    }
     req.send(form)
   }
 

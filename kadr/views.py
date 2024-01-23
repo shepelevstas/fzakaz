@@ -10,15 +10,15 @@ from django.conf import settings
 from django.core.signing import Signer, BadSignature
 from django.urls import reverse
 
+from utils import log, is_htmx
+from utils.io import read_album3, get_user_key, read_users, write_users, set_task_user, unset_task_user, set_album_offer
+
 from . import forms
 
 
 signer = Signer()
+ALBUMS = settings.MEDIA_ROOT / 'users' / '1' / 'albums'
 
-
-def log(*args, **kw):
-  if settings.DEBUG:
-    print(*args, **kw)
 
 def read_ports(PORTS, user, album, kadr_data, MINI=None):
   ports = []
@@ -266,46 +266,95 @@ def read_album(ALBUM, user, signer):
   }
 
 
+def users_list():
+  tmp = []  # :: [[<user uuid>, <role>, <username>]]
+  for uu in (settings.MEDIA_ROOT / 'users').iterdir():
+    if not uu.is_dir(): continue
+    if uu.name == '1': continue
+    role = get_user_key(uu.name, 'role', 'worker')
+    if role != 'worker': continue
+    name = get_user_key(uu.name, 'name', 'NoName')
+    tmp.append([uu.name, role, name])
+  return tmp
+
+
+
+def upload_to_album(req):
+  form1 = forms.UploadAlbumForm(req.POST, req.FILES)
+  if form1.is_valid():
+    album = form1.cleaned_data['album'].strip().upper()
+    ALBUM = ALBUMS / album
+    is_new = not ALBUM.is_dir()
+    MINI = ALBUM / 'mini'
+    MINI.mkdir(parents=True, exist_ok=True)
+    PORTS = ALBUM / 'ports'
+    water = Image.open(settings.BASE_DIR / 'static' / 'water.png')
+
+    for file in req.FILES.getlist('files'):
+      uu = str(uuid4())
+      PORT = PORTS / uu
+      PORT.mkdir(parents=True, exist_ok=True)
+      trg_file = PORT / file.name
+      with trg_file.open('wb') as f:
+        for ch in file.chunks():
+          f.write(ch)
+
+      im = Image.open(trg_file)
+      w, h = im.size
+      LONG_SIDE = 600
+      if w > h: w, h = LONG_SIDE, round(LONG_SIDE / w * h)
+      else: w, h = round(LONG_SIDE / h * w), LONG_SIDE
+      mini = im.resize((w, h))
+      mini_trg = MINI / f'{uu}.jpg'
+      mini.save(mini_trg, quality=40, optimize=True, progressive=True)
+      im.paste(water, (0, 0), water)
+      im.save(trg_file, quality=40, optimize=True, progressive=True)
+
+    return (True, is_new)
+
+  return (False, None)
+
+
 def kadr_albums(req, user):
   log('[ USER ]', user)
 
-  ALBUMS = settings.MEDIA_ROOT / 'users' / user / 'albums'
-  form = forms.UploadAlbumForm()
+  users = users_list()  # :: [[<user uuid>, <role>, <username>]]
+  users = {uu:name for uu,role,name in users}
+
+  groups = [
+    { 'name': 'roles',
+      'ru': 'Группы',
+      'menu': [
+        { 'name': 'worker', 'ru': 'Исполнители' },
+      ],
+    },
+    { 'name': 'users',
+      'ru': 'Люди',
+      'menu': [
+        { 'name': name, 'ru': username }
+        for name, username in users.items()
+      ],
+    },
+  ]
+
+  items = [
+    { 'name': 'kadr', 'ru': 'Кадр' },
+    { 'name': 'names', 'ru': 'Имена' },
+  ]
 
   if req.method == 'POST':
     log('[ POST ]', req.POST)
     action = req.POST.get('action')
+    item = req.POST.get('item')    # kadr | names
+    group = req.POST.get('group')  # roles | users
+    album = req.POST.get('album').strip().upper()  # 2023_2024_18_1A
+    exec_user = req.POST.get('user')
+    ajax = req.POST.get('ajax') == 'true'
 
-    if action == 'upload':
+    if False and action == 'upload':
       log('[ FILES ]', req.FILES)
-      form1 = forms.UploadAlbumForm(req.POST, req.FILES)
-      if form1.is_valid():
-        album = form1.cleaned_data['album'].strip().upper()
-        ALBUM = ALBUMS / album
-        MINI = ALBUM / 'mini'
-        MINI.mkdir(parents=True, exist_ok=True)
-        PORTS = ALBUM / 'ports'
-        water = Image.open(settings.BASE_DIR / 'static' / 'water22_4000.png')
 
-        for file in req.FILES.getlist('files'):
-          uu = str(uuid4())
-          PORT = PORTS / uu
-          PORT.mkdir(parents=True, exist_ok=True)
-          trg_file = PORT / file.name
-          with trg_file.open('wb') as f:
-            for ch in file.chunks():
-              f.write(ch)
-
-          im = Image.open(trg_file)
-          w, h = im.size
-          LONG_SIDE = 600
-          if w > h: w, h = LONG_SIDE, round(LONG_SIDE / w * h)
-          else: w, h = round(LONG_SIDE / h * w), LONG_SIDE
-          mini = im.resize((w, h))
-          mini_trg = MINI / f'{uu}.jpg'
-          mini.save(mini_trg, quality=40, optimize=True, progressive=True)
-          im.paste(water, (0, 0), water)
-          im.save(trg_file, quality=40, optimize=True, progressive=True)
+      succ, is_new = upload_to_album(req)
 
       if req.POST.get('ajax') == 'true':
         data_list = []
@@ -313,15 +362,93 @@ def kadr_albums(req, user):
           data_list.append(read_album2(ALBUM, user))
         return JsonResponse({'data_list': data_list})
 
-  data = []
+    if ajax:
+      if action in ('set_exec', 'unset_exec') and 'value' in req.POST:
+        value = req.POST.get('value')
+        succ = {'set_exec':set_task_user,'unset_exec':unset_task_user}[action](album, item, 'worker', value)
+        if succ:
+          return JsonResponse({'status': 'OK'})
+      return JsonResponse({'status': 'FAIL'})
+
+    if is_htmx(req):
+      log('[ is htmx ]')
+      if action in ('set_exec', 'unset_exec') and 'value' in req.POST:
+        value = req.POST['value']
+        succ = {'set_exec':set_task_user,'unset_exec':unset_task_user}[action](album, item, 'worker', value)
+
+        if not succ:
+          return HttpResponse(f'''
+            <div class="d-inline-flex">
+              <span class="btn badge rounded-pill text-bg-danger">ОШИБКА</span>
+            </div>
+          ''')
+
+        next_action = {'set_exec':'unset_exec','unset_exec':'set_exec'}[action]
+        return render(req, f"kadr/parts/kadr_albums_line_{next_action}.html", {
+          'item_user': value,
+          'users': users,
+          'i': {'album': album},
+          'item': {'name': item},
+        })
+
+      if action in ('add', 'remove') and item in ('kadr', 'names') and group in ('roles', 'users'):
+        log('[ htmx ]', )
+        menu_item_ru = req.POST.get('menu_item_ru')  # Исполнители | User1
+        menu_item_name = req.POST.get('menu_item_name')  # worker | <uuid>
+
+        next_action = {"add":"remove", "remove":"add"}[action]
+        i_class = {"add":"bi-circle text-black-50", "remove":"bi-check-circle text-primary"}[next_action]
+
+        succ = set_album_offer(action, group, album, item, menu_item_name)
+
+        return HttpResponse(f'''
+          <a
+            class="dropdown-item"
+            href="#"
+            hx-post="{req.path}"
+            hx-vals='{{"album":"{album}","item":"{item}","group":"{group}","action":"{next_action}","menu_item_name":"{menu_item_name}","menu_item_ru":"{menu_item_ru}"}}'
+            hx-target="closest li"
+          ><i class="pe-2 bi {i_class}"></i>{menu_item_ru}</a>
+        ''')
+
+      if action == 'upload':
+        log('[ FILES ]', req.FILES)
+        offer = req.POST.get('offer')
+
+        succ, is_new = upload_to_album(req)
+
+        if is_new and offer:
+          for i in offer.split(';'):
+            ac,gr,it,vl = i.split(',')
+            set_album_offer(ac,gr,album,it,vl)
+
+        album_data = read_album3(ALBUMS / album, user)
+        res = render(req, 'kadr/parts/kadr_albums_line.html', {
+          'i': album_data,
+          'role': 'super',
+          'items': items,
+          'groups': groups,
+          'users': users,
+          'new_line': is_new,
+        })
+
+        res.headers['HX-Retarget'] = '#new_line' if is_new else f'tr[data-album="{album}"]'
+
+        return res
+
+  albums = []
   for ALBUM in ALBUMS.iterdir():
-    # data.append(read_album(ALBUM, user, signer))
-    data.append(read_album2(ALBUM, user))
+    albums.append(read_album3(ALBUM, user))
 
   return render(req, 'kadr/kadr_albums.html', {
-    'data': data,
+    'data': albums,
     'user': user,
-    'form': form,
+    'form': forms.UploadAlbumForm(),
+    'role': 'super' if user == '1' else 'worker',
+
+    'items': items,
+    'groups': groups,
+    'users': users,
   })
 
 
@@ -411,4 +538,5 @@ def kadr_signed(req, code):
       return kadr_main(req, data['user'], data['album'], True)
 
   return HttpResponse(raw)
+
 
