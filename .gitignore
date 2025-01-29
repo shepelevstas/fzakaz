@@ -10,4 +10,5 @@ media/orders/**
 media/blanks/**
 foto/migrations/**
 !foto/migrations/__init__.py
-
+/venv
+/media

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from uuid import uuid4
 from operator import itemgetter
 import shutil
@@ -448,7 +449,7 @@ def upload_blanks(request, edit=False):
     for ALBUM in SH.iterdir():
       if not ALBUM.is_dir():continue
       albums.append(load_album(ALBUM))
-  albums.sort(key=lambda d: d['name'])
+  albums.sort(key=lambda d: (d['sh'], int(d['cls'][:-1]), d['cls'][-1]))
 
   return render(request, 'upload_blanks.html', {
     'form': form,
@@ -468,12 +469,18 @@ def money_table(request, sh, year, group, code):
   except BadSignature:
     return HttpResponse('Код неверный')
 
+  after = None
+  if request.GET.get('after'):
+    y,m,d = map(int, request.GET['after'].split('-')[:3])
+    after = datetime.now().replace(year=y, month=m, day=d, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
   table = []
   total = {'name': 'ВСЕГО', 'sum': 0, 'img':''}
 
   for file in ORDERS.iterdir():
     if not file.name.endswith('.json'):continue
     if not file.name.startswith(f'{sh}_{year}{group}_'):continue
+    if after and after > datetime.fromtimestamp(file.stat().st_mtime):continue
     data = read_order(file)
     img = file.name.split('.')[0].split('_')[-1]
     data['img'] = img
@@ -532,6 +539,7 @@ def to_csv_order(data):
   res = []
 
   for k,v in data.items():
+    if v == '': continue
     if '_' not in k: continue
     col, row = k.split('_')
     if col not in COLS: continue
@@ -558,10 +566,17 @@ def download_orders(request, sh_cls, code):
   except BadSignature:
     return HttpResponse('Код неверный')
 
+  after = []
+  if request.GET.get('after'):
+    y,m,d = map(int, request.GET['after'].split('-')[:3])
+    after = datetime.now().replace(year=y, month=m, day=d, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
   content = []
 
   for file in ORDERS.iterdir():
     if not file.is_file() or not file.name.endswith('.json'):continue
+    if not file.name.startswith(sh_cls):continue
+    if after and after > datetime.fromtimestamp(file.stat().st_mtime):continue
     img = file.name.split('.')[0].split('_')[-1]
     data = read_order(file)
     content.append([
@@ -571,6 +586,10 @@ def download_orders(request, sh_cls, code):
     ] + to_csv_order(data))
 
   content = '\n'.join(';'.join(row) for row in content)
+  #content = chr(1025).join(content.split(chr(203)))
+  content = content.replace(chr(203), 'Ё')
+  content = content.replace(chr(235), 'ё')
+  content = content.encode('cp1251')
   sh_cls = sh_cls.lower().translate(en)
   filename = f"{sh_cls}_web.csv"
   response = HttpResponse(content, content_type='application/text charset=utf-8')

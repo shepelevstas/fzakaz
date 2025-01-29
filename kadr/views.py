@@ -285,7 +285,7 @@ def kadr_albums(req, user):
         MINI = ALBUM / 'mini'
         MINI.mkdir(parents=True, exist_ok=True)
         PORTS = ALBUM / 'ports'
-        water = Image.open(settings.BASE_DIR / 'static' / 'water22_4000.png')
+        water = Image.open(settings.BASE_DIR / 'static' / 'water.png')
 
         for file in req.FILES.getlist('files'):
           uu = str(uuid4())

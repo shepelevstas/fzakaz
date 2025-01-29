@@ -6,7 +6,23 @@
   <div class="position-sticky top-0 shadow bg-white">
     <h2 class="d-flex align-items-center justify-content-center">
       Школа {{sh}}, класс {{year}}{{group}}
-      <a href="{% url 'download_orders' sh_cls code %}" class="btn btn-sm btn-outline-success ms-2"><i class="bi bi-file-earmark-arrow-down-fill"></i></a>
+      {#<a href="{% url 'download_orders' sh_cls code %}" class="btn btn-sm btn-outline-success ms-2"><i class="bi bi-file-earmark-arrow-down-fill"></i></a>#}
+      <form action="{% url 'download_orders' sh_cls code %}" class="ms-2">
+	      <div class="input-group input-group-sm">
+		<input class="form-control" type="date" name="after">
+		<button class="btn btn-outline-success">
+			<i class="bi bi-file-earmark-arrow-down-fill"></i>
+		</button>
+	      </div>
+      </form>
+      <form action="." class="ms-2">
+	      <div class="input-group input-group-sm">
+		<input class="form-control" type="date" name="after">
+		<button class="btn btn-outline-success">
+			<i class="bi bi-eye-fill"></i>
+		</button>
+	      </div>
+      </form>
     </h2>
   </div>
 
@@ -49,3 +65,8 @@
   </div>
 
 {% endblock content %}
+
+{% block js_libs %}
+	{{ block.super }}
+	<script src="/static/js/htmx203.min.js"></script>
+{% endblock js_libs %}
