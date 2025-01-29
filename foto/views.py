@@ -357,29 +357,68 @@ def orders(request):
   ...
 
 
+def load_album(ALBUM):
+  album = f'{ALBUM.parent.name}_{ALBUM.name}'
+  blanks_count = len([None for i in ALBUM.iterdir() if i.is_dir()])
+  closed = (ALBUM / 'closed').is_file()
+  ordered_count = 0
+  for o in ORDERS.iterdir():
+    if not o.name.startswith(f'{album}_'): continue
+    order = read_order(o)
+    if order_cost(order):
+      ordered_count += 1
+  return {
+    'name': album,
+    'sh': ALBUM.parent.name,
+    'cls': ALBUM.name,
+    'sign': signer.sign(album),
+    'blanks_count': blanks_count,
+    'ordered_count': ordered_count,
+    'order_progress': ordered_count / blanks_count * 100,
+    'closed': closed,
+  }
+
+
+def upload(request):
+  form = UploadBlanksForm(request.POST, request.FILES)
+  if form.is_valid():
+    sh = form.cleaned_data['sh'].upper()
+    yr = form.cleaned_data["yr"]
+    gr = form.cleaned_data["gr"][0].lower().translate(ru).upper()
+
+    ALBUM = BLANKS / sh / f'{yr}{gr}'
+    ALBUM.mkdir(parents=True, exist_ok=True)
+
+    existing_file_dirs = {}
+    for file_dir in ALBUM.iterdir():
+      if not file_dir.is_dir():continue
+      for f in file_dir.iterdir():
+        img = f.name.split('.')[0].split('_')[-1]
+        existing_file_dirs[img] = [file_dir, f]
+
+    for file in request.FILES.getlist('files'):
+      img, ext = file.name.split('.')
+      img = img.split('_')[-1]
+      exist_file_dir, exist_trg_file = existing_file_dirs.get(img) or [None, None]
+      if exist_file_dir:
+        file_dir = exist_file_dir
+      else:
+        file_dir = ALBUM / str(uuid4())
+        file_dir.mkdir()
+      trg_file = file_dir / f'{sh}_{yr}{gr}_{img}.{ext}'
+      if trg_file.exists():
+        trg_file.unlink()
+      with trg_file.open('wb') as f:
+        for ch in file.chunks():
+          f.write(ch)
+
+  if request.POST.get('ajax') == 'true':
+    album_data = load_album(ALBUM)
+    return JsonResponse({'data': album_data})
+
+
 def upload_blanks(request, edit=False):
   form = UploadBlanksForm()
-
-  def load_album(ALBUM):
-    album = f'{ALBUM.parent.name}_{ALBUM.name}'
-    blanks_count = len([None for i in ALBUM.iterdir() if i.is_dir()])
-    closed = (ALBUM / 'closed').is_file()
-    ordered_count = 0
-    for o in ORDERS.iterdir():
-      if not o.name.startswith(f'{album}_'): continue
-      order = read_order(o)
-      if order_cost(order):
-        ordered_count += 1
-    return {
-      'name': album,
-      'sh': ALBUM.parent.name,
-      'cls': ALBUM.name,
-      'sign': signer.sign(album),
-      'blanks_count': blanks_count,
-      'ordered_count': ordered_count,
-      'order_progress': ordered_count / blanks_count * 100,
-      'closed': closed,
-    }
 
   if request.method == 'POST':
     log('[ upload_blanks POST ]', request.POST)
@@ -395,41 +434,9 @@ def upload_blanks(request, edit=False):
         shutil.rmtree(trg)
 
     elif action == 'upload':
-      form = UploadBlanksForm(request.POST, request.FILES)
-      if form.is_valid():
-        sh = form.cleaned_data['sh'].upper()
-        yr = form.cleaned_data["yr"]
-        gr = form.cleaned_data["gr"][0].lower().translate(ru).upper()
-
-        ALBUM = BLANKS / sh / f'{yr}{gr}'
-        ALBUM.mkdir(parents=True, exist_ok=True)
-
-        existing_file_dirs = {}
-        for file_dir in ALBUM.iterdir():
-          if not file_dir.is_dir():continue
-          for f in file_dir.iterdir():
-            img = f.name.split('.')[0].split('_')[-1]
-            existing_file_dirs[img] = [file_dir, f]
-
-        for file in request.FILES.getlist('files'):
-          img, ext = file.name.split('.')
-          img = img.split('_')[-1]
-          exist_file_dir, exist_trg_file = existing_file_dirs.get(img) or [None, None]
-          if exist_file_dir:
-            file_dir = exist_file_dir
-          else:
-            file_dir = ALBUM / str(uuid4())
-            file_dir.mkdir()
-          trg_file = file_dir / f'{sh}_{yr}{gr}_{img}.{ext}'
-          if trg_file.exists():
-            trg_file.unlink()
-          with trg_file.open('wb') as f:
-            for ch in file.chunks():
-              f.write(ch)
-
-      if request.POST.get('ajax') == 'true':
-        album_data = load_album(ALBUM)
-        return JsonResponse({'data': album_data})
+      res = upload(request)
+      if res:
+        return res
 
     elif action == 'close':
       log('[ CLOSE ]')
@@ -596,4 +603,16 @@ def download_orders(request, sh_cls, code):
   response['Content-Disposition'] = f'attachment; filename="{filename}"'.encode()
 
   return response
+
+
+def play(req):
+  log('[ POST ]', req.POST)
+  form = ContactInfoForm(req.POST or None)
+  log('[ is_valid ]', form.is_valid())
+  if hasattr(form, 'cleaned_data'):
+    log('[ cleaned_data ]', form.cleaned_data)
+  if not form.is_valid():
+    log('[ errors ]', form.errors)
+
+  return render(req, 'play.html', {'form': form})
 

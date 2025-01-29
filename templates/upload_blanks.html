@@ -163,7 +163,7 @@
         const tr = document.createElement('TR')
         tr.dataset.album = album.name
         tr.classList.add('align-middle')
-        const progress_bg = `${'bg-warning'?album.order_progress<50:'bg-success'?album.order_progress<100:'bg-primary'}${album.closed?' bg-opacity-50':''}` 
+        const progress_bg = `${'bg-warning'?album.order_progress<50:'bg-success'?album.order_progress<100:'bg-primary'}${album.closed?' bg-opacity-50':''}`
 
         tr.innerHTML = `
         <td class="ps-2 ps-lg-4">
@@ -174,7 +174,7 @@
             <i class="bi bi-copy"></i>
           </button>
           <a href="{{request.scheme}}://{{request.get_host}}/money_table/${album.sign}" class="btn btn-sm"><i class="bi bi-table"></i></a>
-          ${album.closed?'<strong class="text-secondary">ЗАКРЫТ</strong>' : ''}
+          ${album.closed ? '<strong class="text-secondary">ЗАКРЫТ</strong>' : ''}
         </td>
 
         <td class="text-center">
@@ -263,4 +263,3 @@
     });
   </script>
 {% endblock js %}
-

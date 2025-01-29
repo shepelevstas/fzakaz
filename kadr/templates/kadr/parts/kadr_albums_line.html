@@ -1,0 +1,137 @@
+{% load mytags %}
+
+<tr data-album="{{i.album}}" class="align-middle">
+  <td class="ps-2 ps-lg-4">
+    {{i.album}}
+  </td>
+
+  <td class="item_name text-center">
+    {% if i.names_done %}
+      <span class="item_done">{{i.names_done}}</span>
+      <div class="progress rounded-pill" style="height:10px;">
+        <div class="item_progress progress-bar {% if i.names_progress < 100 %}bg-warning{% endif %}" style="width: {{i.names_progress}}%;"></div>
+      </div>
+    {% endif %}
+  </td>
+
+  <td class="item_kadr text-center">
+    {% if i.kadr_done %}
+      <span class="item_done">{{i.kadr_done}}</span>
+      <div class="progress rounded-pill" style="height:10px;">
+        <div class="item_progress progress-bar {% if i.kadr_progress < 100 %}bg-warning{% endif %}" style="width: {{i.kadr_progress}}%;"></div>
+      </div>
+    {% endif %}
+  </td>
+
+  <td class="item_exec text-center pe-2 pe-lg-4">
+
+      {% if role == 'super' %}
+        {% for item in items %}
+
+          <div class="d-inline-flex">
+            <a href="{{i.signed_url|dict_get:item.name}}"
+              class="btn badge rounded-pill rounded-end-0 text-bg-primary">
+              {{item.ru}}
+            </a>
+
+            <!-- USER SELECT -->
+            {% with i.item_user|dict_get:item.name as item_user %}
+              {% if item_user %}
+                {% include 'kadr/parts/kadr_albums_line_unset_exec.html' %}
+              {% else %}
+                {% include 'kadr/parts/kadr_albums_line_set_exec.html' %}
+              {% endif %}
+            {% endwith %}
+
+            <span class="btn badge rounded-pill rounded-start-0 text-bg-success dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">Открыть</span>
+
+            <ul class="dropdown-menu shadow">
+              {% for group in groups %}
+                <li><span class="dropdown-item-text">{{group.ru}}</span></li>
+
+                {% for mi in group.menu %}
+                  {% with i.offer|dict_get:group.name|dict_get:item.name as mi_list %}
+                    <li><a href="#" class="dropdown-item"
+                      hx-post="{{request.path}}"
+                      hx-vals='{"album": "{{i.album}}", "item": "{{item.name}}", "group": "{{group.name}}", "action": "{% if mi.name in mi_list %}remove{% else %}add{% endif %}", "menu_item_name": "{{mi.name}}", "menu_item_ru": "{{mi.ru}}"}'
+                      hx-target="closest li"
+                    >
+                      <i class="pe-2 bi {% if mi.name in mi_list %}bi-check-circle text-primary{% else %}bi-circle text-black-50{% endif %}"></i>
+                      {{mi.ru}}
+                    </a></li>
+                  {% endwith %}
+                {% endfor %}
+
+                {% if not forloop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
+              {% endfor %}
+            </ul>
+
+          </div>
+
+        {% endfor %}
+      {% elif role == 'worker' %}
+        <div class="btn-toolbar d-inline-flex">
+
+          {% if i.url_signed_kadr %}
+            {% if i.kadr_user_is_me %}
+              <div class="btn-group btn-group-sm me-2">
+                <a href="{{i.url_signed_kadr}}" class="btn btn-outline-primary">Кадр</a>
+                <button
+                  class="btn btn-outline-danger"
+                  hx-post="{{request.path}}"
+                  hx-target="closest .btn-group"
+                  name="action"
+                  value="giveup_user"
+                  hx-vals='{"album":"{{i.album}}","item":"kadr"}'
+                >Отказаться</button>
+              </div>
+            {% else %}
+              <div class="btn-group btn-group-sm me-2">
+                <a href="#" class="btn btn-outline-secondary">Кадр</a>
+                <button
+                  class="btn btn-outline-success"
+                  hx-post="{{request.path}}"
+                  hx-target="closest .btn-group"
+                  name="action"
+                  value="take_user"
+                  hx-vals='{"album":"{{i.album}}","item":"kadr"}'
+                >Взять</button>
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {% if i.url_signed_names %}
+            {% if i.names_user_is_me %}
+              <div class="btn-group btn-group-sm">
+                <a href="{{i.url_signed_names}}" class="btn btn-outline-primary">Имена</a>
+                <button
+                  class="btn btn-outline-danger"
+                  hx-post="{{request.path}}"
+                  hx-target="closest .btn-group"
+                  name="action"
+                  value="giveup_user"
+                  hx-vals='{"album":"{{i.album}}","item":"names"}'
+                >Отказаться</button>
+              </div>
+            {% else %}
+              <div class="btn-group btn-group-sm">
+                <a href="#" class="btn btn-outline-secondary">Имена</a>
+                <button
+                  class="btn btn-outline-success"
+                  hx-post="{{request.path}}"
+                  hx-target="closest .btn-group"
+                  name="action"
+                  value="take_user"
+                  hx-vals='{"album":"{{i.album}}","item":"names"}'
+                >Взять</button>
+              </div>
+            {% endif %}
+          {% endif %}
+
+        </div>
+      {% endif %}
+
+
+  </td>
+</tr>
+{% if new_line %}<tr id="new_line"></tr>{% endif %}

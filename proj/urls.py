@@ -23,7 +23,12 @@ urlpatterns = [
     # kadr
     path('kadr/', include('kadr.urls')),
 
+    path('work/', include('work.urls')),
+
     path('admin/', admin.site.urls),
+
+    # path('play/', views.play, name='play'),
+    path('play/', include('play.urls')),
 ]
 
 if settings.DEBUG:

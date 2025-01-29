@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+
+{% block js_libs %}
+  {{ block.super }}
+  <script src="{% static 'js/clipboard.min.js' %}"></script>
+  <script src="/static/upq.js"></script>
+{% endblock js_libs %}
+
+
+{% block content %}
+  {% if edit %}
+    <div class="position-sticky top-0 shadow bg-white p-2">
+      <form id="upload_form" action="." method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{form}}
+        <button type='submit' name='action' value='upload' class="btn btn-primary">upload</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <table class="table table-sm bg-white">
+    <thead>
+      <th class="ps-2 ps-lg-4">альбом</th>
+      <th class="text-center">заказы</th>
+      <th class="text-center pe-2 pe-lg-4">дейст.</th>
+    </thead>
+
+    <tbody id="album_items">
+      {% for album in albums %}
+        <tr data-album="{{album.name}}" class="align-middle">
+          <td class="ps-2 ps-lg-4">
+            <a href="{{request.scheme}}://{{request.get_host}}/{{album.sign}}" class="">
+              {{album.name}}
+            </a>
+            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/{{album.sign}}">
+              <i class="bi bi-copy"></i>
+            </button>
+            <a href="{{request.scheme}}://{{request.get_host}}/money_table/{{album.sign}}" class="btn btn-sm"><i class="bi bi-table"></i></a>
+            {% if album.closed %}<strong class="text-secondary">ЗАКРЫТ</strong>{% endif %}
+          </td>
+
+          <td class="text-center">
+            <span class="item_count">{{album.ordered_count}} / {{album.blanks_count}}</span>
+            <div class="progress rounded-pill" style="height:10px;">
+              <div class="progress-bar item_progress {% if album.closed %}bg-opacity-50{% endif %} {% if album.order_progress < 50 %}bg-warning{% elif album.order_progress < 100 %}bg-success{% else %}bg-primary{% endif %}" style="width: {{album.order_progress}}%;"></div>
+            </div>
+          </td>
+
+          <td class="text-center pe-2 pe-lg-4">
+            <form action="." method="post" class="action_form d-inline-block">
+              {% csrf_token %}
+              <input type="hidden" name="link" value="{{album.sign}}"/>
+
+              {% if edit %}
+                <button class="btn btn-outline-danger btn-sm" type="submit" name='action' value="delete">
+                  <i class="bi bi-trash-fill"></i>
+                </button>
+              {% endif %}
+
+              {% if album.closed %}
+                <button class="btn btn-link btn-sm" type="submit" name="action" value="open">Открыть</button>
+              {% else %}
+                <button class="btn btn-link btn-sm" type="submit" name="action" value="close">Закрыть</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% comment %} TODO ajax upload bar {% endcomment %}
+  <div id="upload_bar" class="position-fixed bottom-0 bg-white shadow shadow-lg w-100 p-2" style="transition:transform .5s;transform:translatey(100%);">
+    <div class="progress rounded-pill">
+      <div class="progress-bar" style="width: 0%;"></div>
+    </div>
+  </div>
+{% endblock content %}
+
+
+{% block js %}
+  <script>
+    ;document.addEventListener('DOMContentLoaded', () => {
+      new ClipboardJS('.copylink')
+
+      const form = document.querySelector('form#upload_form[method="POST"]')
+      form.querySelector('select[name="yr"]').value = ''
+      form.querySelector('select[name="gr"]').value = ''
+
+      const bar = document.querySelector('#upload_bar')
+      const showBar = window.showBar = () => {bar.style.transform = 'none'}
+      const hideBar = window.hideBar = () => {bar.style.transform = 'translatey(100%)'}
+      const setValue = window.setBar = value => {
+        bar.querySelector('.progress .progress-bar').style.width = `${value*100}%`
+      }
+
+      const upq = window.upq = new UploadQue({
+        url: '{{ request.path }}',
+        formAdditionalFields: {
+          csrfmiddlewaretoken: '{{ csrf_token }}',
+          action: 'upload',
+          ajax: 'true',
+        },
+        formFilefieldName: 'files',
+        add:(item) => {
+
+          const done = upq.count_done()
+          const one = 100 / upq.que.length
+          const cur_item = upq.cur_item()
+          let value = 0
+          if (cur_item) {
+            value = one * (done + cur_item.done / 100) / 100
+          } else {
+            value = one * done / 100
+          }
+
+          showBar()
+          setValue(value)
+
+        },
+        progress:(item, event) => {
+
+          const done = upq.count_done()
+          const one = 100 / upq.que.length
+          const value = one * (done + item.done / 100) / 100
+
+          setValue(value)
+
+        },
+        load:(item, event) => {
+
+          let data = null
+          try {
+            const response_json = JSON.parse(event.target.responseText)
+            if (response_json.data) {
+              data = response_json.data
+            }
+          } catch (error) {
+            console.error(error)
+          }
+          if (data) {
+            updateAlbums(data)
+          }
+
+          const done = upq.count_done()
+          const todo = upq.que.length - done
+          if (todo === 0) {
+            upq.que = []
+            hideBar()
+            //window.location.reload()
+          } else {
+            console.log('more todo', todo)
+          }
+
+        },
+      })
+
+      function renderLine(album) {
+
+        const tr = document.createElement('TR')
+        tr.dataset.album = album.name
+        tr.classList.add('align-middle')
+        const progress_bg = `${'bg-warning'?album.order_progress<50:'bg-success'?album.order_progress<100:'bg-primary'}${album.closed?' bg-opacity-50':''}` 
+
+        tr.innerHTML = `
+        <td class="ps-2 ps-lg-4">
+          <a href="{{request.scheme}}://{{request.get_host}}/${album.sign}">
+            ${album.name}
+          </a>
+          <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/${album.sign}">
+            <i class="bi bi-copy"></i>
+          </button>
+          <a href="{{request.scheme}}://{{request.get_host}}/money_table/${album.sign}" class="btn btn-sm"><i class="bi bi-table"></i></a>
+          ${album.closed?'<strong class="text-secondary">ЗАКРЫТ</strong>' : ''}
+        </td>
+
+        <td class="text-center">
+          <span class="item_count">${album.ordered_count} / ${album.blanks_count}</span>
+          <div class="progress rounded-pill" style="height:10px;">
+            <div class="progress-bar item_progress ${progress_bg}" style="width: ${album.order_progress}%;"></div>
+          </div>
+        </td>
+
+        <td class="text-center pe-2 pe-lg-4">
+          <form action="." method="post" class="d-inline-block action_form">
+            {% csrf_token %}
+            <input type="hidden" name="link" value="${album.sign}"/>
+
+            {% if edit %}
+              <button class="btn btn-outline-danger btn-sm" type="submit" name='action' value="delete">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            {% endif %}
+
+            ${'<button class="btn btn-link btn-sm" type="submit" name="action" value="open">Открыть</button>'?album.closed:'<button class="btn btn-link btn-sm" type="submit" name="action" value="close">Закрыть</button>'}
+          </form>
+        </td>
+        `
+        return tr
+      }
+
+      function updateAlbums(album) {
+        /* albums.append({
+            'name': album,
+            'sh': sh.name,
+            'cls': cls.name,
+            'sign': signer.sign(album),
+            'blanks_count': blanks_count,
+            'ordered_count': ordered_count,
+            'order_progress': ordered_count / blanks_count * 100,
+            'closed': closed,
+          })
+        */
+        const line = document.querySelector(`tbody#album_items tr[data-album='${album.name}']`)
+        if (line) {
+
+          const count = line.querySelector('.item_count')
+          count.textContent = `${album.ordered_count} / ${album.blanks_count}`
+
+          const progress = line.querySelector('.item_progress')
+          progress.style.width = `${album.order_progress}%`
+
+          progress.classList.remove(
+            'bg-success', 'bg-primary', 'bg-warning',
+            'bg-opacity-50',
+          )
+
+          if (album.order_progress < 50) {
+            progress.classList.add('bg-warning')
+          } else if (album.order_progress < 100) {
+            progress.classList.add('bg-success')
+          } else {
+            progress.classList.add('bg-primary')
+          }
+
+          if (album.closed) {
+            progress.classList.add('bg-opacity-50')
+          }
+
+        } else {
+          const new_line = renderLine(album)
+          document.querySelector('tbody#album_items').appendChild(new_line)
+        }
+      }
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault()
+        const input_files = form.querySelector('input[type="file"][name="files"]')
+        const files = input_files.files
+
+        const data = {}
+        data.sh = form.querySelector('input[type="text"][name="sh"]').value
+        data.yr = form.querySelector('select[name="yr"]').value
+        data.gr = form.querySelector('select[name="gr"]').value
+
+        upq.addFiles(files, data)
+
+        input_files.value = ''
+      })
+    });
+  </script>
+{% endblock js %}
