@@ -7,7 +7,7 @@ class MultipleFileInput(forms.ClearableFileInput):
 
 class MultipleFileField(forms.FileField):
   def __init__(self, *args, **kwargs):
-    kwargs.setdefault('widget', MultipleFileInput(attrs={'multiple': ''}))
+    kwargs.setdefault('widget', MultipleFileInput(attrs={'multiple': '', 'class': 'form-control w-auto'}))
     super().__init__(*args, **kwargs)
 
   def clean(self, data, initial=None):
@@ -40,18 +40,28 @@ class ContactInfoForm(forms.Form):
   )
 
 
+# class BSCharField(forms.CharField):
+#   def __init__(self, *args, **kwargs):
+
+
+
 class UploadBlanksForm(forms.Form):
-  session = forms.CharField(label='съемка', required=True)
-  sh = forms.CharField(label='SH', required=True)
+  session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
+  sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
   # yr = forms.CharField(label='YR', required=True)
   yr = forms.ChoiceField(label="Год", required=True, choices=[
     (i,i) for i in range(1,12)
-  ])
+  ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
   # gr = forms.CharField(label='GR', required=True)
   gr = forms.ChoiceField(label="Класс", required=True, choices=[
     (i, i) for i in 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ'
-  ])
+  ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
   #files = forms.FileField(widget=forms.FileInput(attrs={'multiple': True, 'accept':'image/jpeg'}), required=True)
   files = MultipleFileField(required=True)
+
+  # class Meta:
+  #   widgets = {
+  #     "session": forms.TextInput(attrs={"class": "form-control"})
+  #   }
 
 

@@ -14,7 +14,7 @@
 {% block content %}
   {% if edit %}
     <div class="position-sticky top-0 shadow bg-white p-2">
-      <form id="upload_form" action="." method="post" enctype="multipart/form-data">
+      <form id="upload_form" action="." method="post" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center">
         {% csrf_token %}
 
         {% for f in form %}{{f.label}}:{{f}}{% endfor %}
