@@ -10,3 +10,5 @@ foto/migrations/**
 !foto/migrations/__init__.py
 /venv
 /media
+/proj/settings_local.py
+proj/settings_local.py
