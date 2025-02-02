@@ -140,7 +140,7 @@
             <div class="card shadow">
               {% if "style" in item or "blank_img_style" in item %}
                 <div class="card-img-top"
-                style="background-image:url('{{blank}}');{{item.style|default:item.blank_img_style}}">
+                style="background-image:url('{{blank}}');{% if item.blank_img_style %}{{item.blank_img_style}}{% else %}{{item.style}}{% endif %}">
                 </div>
               {% endif %}
               <div class="card-body">

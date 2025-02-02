@@ -504,7 +504,10 @@ class Album:
 
   @property
   def ordered_count(self):
-    return len([None for i in self.orders_dir.iterdir() if i.name.startswith(f'{self.sign}_') and self.order_cost(i)])
+    return len([
+      None for i in self.orders_dir.iterdir()
+      if i.name.startswith(f'{self.id}_') and self.order_cost(i)
+    ])
 
   @property
   def blanks_count(self):
