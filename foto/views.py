@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 from operator import itemgetter
 import shutil
+import json
+from copy import deepcopy
 
 from django.http.response import HttpResponse
 from django.shortcuts import render
@@ -98,19 +100,27 @@ ROWS = [
 signer = Signer()
 
 
-def signed_view(request, sh, year, group, code):
+def signed_view(request, session, sh, year, group, code):
   ''' sign LIKE `158_1И_8810:2X-8h6e7DcsINNwlnWRLTpsr05abY9pgsTkPwwZHhh8`
       '158_1А:vKw6vyj3opqhm46qsrvYgsHhrIpahSiTioqP-40YySw'
       '158_1И:QWhCPQxnhyvBI0ezGKg43SbU_ozaQWua4DSo_GVg_uc'
   '''
+  year = str(year)
   print('sh',sh, 'year',year, 'group',group,'code',code)
-  sign = f'{sh}_{year}{group}:{code}'
+  sign = f'{session}__{sh}_{year}{group}:{code}'
 
   try:
     unsigned = Signer().unsign(sign)
+    print('[unsigned]', unsigned)
 
   except BadSignature:
     return HttpResponse('Код неверный')
+
+  return zakaz(request, session, sh, year, group)
+
+  album = Album(session, sh, year, group, None, None)
+
+
 
   sh, *cls_img = unsigned.split('_')
   cls = cls_img[0]
@@ -130,118 +140,9 @@ def signed_view(request, sh, year, group, code):
 
   print('[zakaz]', sh, cls, uuid)
 
-  return zakaz(request, sh, cls, uuid)
+  return zakaz(request, session, sh, year, group, uuid)
 
-
-def zakaz(request, sh=None, cls=None, uuid=None):
-  '''uuid like 7f094d61-bb45-4375-81fe-32fcbb383d5c'''
-
-  if sh is None:
-    return render(request, 'zakaz_index.html', {
-      'schools': sorted([ {"name":i.name,"title":f"Школа {i.name}"} for i in (settings.MEDIA_ROOT / 'blanks').iterdir()], key=itemgetter('name')),
-    })
-
-  if cls is None:
-    return render(request, 'zakaz_index.html', {
-      's': sh,
-      'classes': sorted([ i.name for i in (settings.MEDIA_ROOT / 'blanks' / sh).iterdir()], key=lambda i: int(i[:-1])*1000+ord(i[-1].upper())),
-    })
-
-  ALBUM = settings.MEDIA_ROOT / 'blanks' / sh.upper() / cls.upper()
-
-  closed = (ALBUM / 'closed').is_file()
-
-  if uuid is None:
-    blanks = [{
-      'uuid': i.name,
-      'blk': next(i.iterdir()).name
-    } for i in (settings.MEDIA_ROOT / 'blanks' / sh / cls).iterdir() if i.is_dir()]
-
-    print('[s]', sh)
-    print('[c]', cls)
-    print('[blanks]', blanks)
-
-    return render(request, 'zakaz_index.html', {
-      "s": sh,
-      "c": cls,
-      'blanks': blanks,
-    })
-
-  try:
-    imgname = next((settings.MEDIA_ROOT / 'blanks' / sh.upper() / cls.upper() / str(uuid)).glob('*.jpg')).name
-  except StopIteration:
-    return HttpResponse('Not Found', 404)
-
-  data = request.POST
-
-  '''goods = {
-    "port": {
-      "title": "Портрет",
-      "amounts": {
-        "f10":    {"title": "Фото 10х15",       "price": 300, "q":0},
-        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
-        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
-        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
-        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
-        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
-        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
-        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
-        "pill":   {"title": "Подушка",          "price": 850, "q":0},
-        "mug":    {"title": "Кружка",           "price": 600, "q":0},
-        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
-        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
-      },
-      "style": "aspect-ratio:726/527;background-position:6.3% 3.2%;background-size:166%;transform:rotate(90deg);margin:13.7% 0;border-radius:0;",
-    },
-
-    "vint": {
-      "title": "Виньетка",
-      "amounts": {
-        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
-        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
-        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
-        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
-        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
-        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
-        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
-        "pill":   {"title": "Подушка",          "price": 850, "q":0},
-        "mug":    {"title": "Кружка",           "price": 600, "q":0},
-        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
-        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
-      },
-      "style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 48.5%;",
-    },
-
-    "coll": {
-      "title": "Коллаж",
-      "amounts": {
-        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
-        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
-        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
-        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
-        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
-        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
-        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
-        "pill":   {"title": "Подушка",          "price": 850, "q":0},
-        "mug":    {"title": "Кружка",           "price": 600, "q":0},
-        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
-        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
-      },
-      "style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 94%;",
-    },
-
-    "all": {
-      "title": "Все фото",
-      "amounts": {
-        "book": {"title": "Фотокнига (обложка - коллаж, разворот - виньетка)",         "price": 990, "q":0},
-        "set":  {"title": "Выгодный комплект (портрет, коллаж и виньетка 20х30)", "price": 800, "q":0},
-      },
-      "style": "aspect-ratio:1205/1795;background-size:100%;background-position:center;",
-    },
-  }'''
-
-  # 2023-2024
-  goods = {
+price_2023_fall = {
     "port": {
       "title": "Портрет",
       "amounts": {
@@ -311,41 +212,425 @@ def zakaz(request, sh=None, cls=None, uuid=None):
     },
   }
 
-  order_format = 'json'
+PRICELISTS = {
+  'default': price_2023_fall,
+  'price_old': {
+    "port": {
+      "title": "Портрет",
+      "amounts": {
+        "f10":    {"title": "Фото 10х15",       "price": 300, "q":0},
+        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
+        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
+        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
+        "pill":   {"title": "Подушка",          "price": 850, "q":0},
+        "mug":    {"title": "Кружка",           "price": 600, "q":0},
+        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
+        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
+      },
+      "style": "aspect-ratio:726/527;background-position:6.3% 3.2%;background-size:166%;transform:rotate(90deg);margin:13.7% 0;border-radius:0;",
+    },
 
-  order_file = settings.MEDIA_ROOT / 'orders' / f'{imgname.split(".")[0]}.{order_format}'
+    "vint": {
+      "title": "Виньетка",
+      "amounts": {
+        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
+        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
+        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
+        "pill":   {"title": "Подушка",          "price": 850, "q":0},
+        "mug":    {"title": "Кружка",           "price": 600, "q":0},
+        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
+        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
+      },
+      "style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 48.5%;",
+    },
 
-  if not data and order_file.is_file():
-    data = read_order(order_file, format=order_format)
+    "coll": {
+      "title": "Коллаж",
+      "amounts": {
+        "f15":    {"title": "Фото 15х23",       "price": 300, "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 350, "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 450, "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 300, "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 350, "q":0},
+        "calend": {"title": "Календарь 30x42",  "price": 450, "q":0},
+        "rasp":   {"title": "Расписание 30x42", "price": 450, "q":0},
+        "pill":   {"title": "Подушка",          "price": 850, "q":0},
+        "mug":    {"title": "Кружка",           "price": 600, "q":0},
+        "tshirt": {"title": "Футболка",         "price": 950, "q":0},
+        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
+      },
+      "style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 94%;",
+    },
 
-  if data:
-    for good_name, amounts in goods.items():
-      for name, item in amounts['amounts'].items():
-        item["q"] = data.get(f'{good_name}_{name}', 0)
+    "all": {
+      "title": "Все фото",
+      "amounts": {
+        "book": {"title": "Фотокнига (обложка - коллаж, разворот - виньетка)",         "price": 990, "q":0},
+        "set":  {"title": "Выгодный комплект (портрет, коллаж и виньетка 20х30)", "price": 800, "q":0},
+      },
+      "style": "aspect-ratio:1205/1795;background-size:100%;background-position:center;",
+    },
+  },
+  'price_2023_fall': price_2023_fall,
+  'price_2025_spring': {
+    "8mar": {
+      "title": "8 Марта",
+      "amounts": {
+        "f10":    {"title": "Фото 10х15",       "price": 400,  "q":0},
+        "f15":    {"title": "Фото 15х23",       "price": 450,  "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 500,  "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 600,  "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 500,  "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 600,  "q":0},
+        "pill":   {"title": "Подушка",          "price": 1200, "q":0},
+        "mug":    {"title": "Кружка",           "price": 900,  "q":0},
+        "tshirt": {"title": "Футболка",         "price": 1200, "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,    "q":0},
+      },
+      "blank_img_style": "aspect-ratio:8/12;background-size:201%;",
+    },
+    "23feb": {
+      "title": "23 Февраля",
+      "amounts": {
+        "f10":    {"title": "Фото 10х15",       "price": 400,  "q":0},
+        "f15":    {"title": "Фото 15х23",       "price": 450,  "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 500,  "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 600,  "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 500,  "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 600,  "q":0},
+        "pill":   {"title": "Подушка",          "price": 1200, "q":0},
+        "mug":    {"title": "Кружка",           "price": 900,  "q":0},
+        "tshirt": {"title": "Футболка",         "price": 1200, "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,    "q":0},
+      },
+      "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;",
+    },
+    "9may": {
+      "title": "9 Мая",
+      "amounts": {
+        "f10":    {"title": "Фото 10х15",       "price": 400,  "q":0},
+        "f15":    {"title": "Фото 15х23",       "price": 450,  "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 500,  "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 600,  "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 500,  "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 600,  "q":0},
+        "pill":   {"title": "Подушка",          "price": 1200, "q":0},
+        "mug":    {"title": "Кружка",           "price": 900,  "q":0},
+        "tshirt": {"title": "Футболка",         "price": 1200, "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,    "q":0},
+      },
+      "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;",
+    },
+    "pozdr": {
+      "title": "Поздравляю!",
+      "amounts": {
+        "f10":    {"title": "Фото 10х15",       "price": 400,  "q":0},
+        "f15":    {"title": "Фото 15х23",       "price": 450,  "q":0},
+        "f20":    {"title": "Фото 20х30",       "price": 500,  "q":0},
+        "f30":    {"title": "Фото 30х42",       "price": 600,  "q":0},
+        "m10":    {"title": "Магнит 10х15",     "price": 500,  "q":0},
+        "m15":    {"title": "Магнит 15х23",     "price": 600,  "q":0},
+        "pill":   {"title": "Подушка",          "price": 1200, "q":0},
+        "mug":    {"title": "Кружка",           "price": 900,  "q":0},
+        "tshirt": {"title": "Футболка",         "price": 1200, "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,    "q":0},
+      },
+      "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;",
+    },
+    "BONUS": {
+      "text": "При заказе от 2000р - все четыре электронные фото - в подарок!",
+      "success": "Все четыре электронные фото - в подарок!",
+      "sum": 2000,
+    },
+  },
+}
 
-  contacts = ContactInfoForm(data or None)
+class Album:
+  from functools import lru_cache
+
+  def __init__(self, session, sh, shyear, group, uuid=None, imgn=None):
+    self.session = session
+    self.sh = sh
+    self.shyear = shyear
+    self.group = group
+    self.cls = group
+    self.uuid = uuid
+    self.imgn = imgn
+    self.blanks_top = settings.MEDIA_ROOT / 'blanks'
+    self.blanks_ses = self.blanks_top / session
+    self.blanks_sh = self.blanks_ses / sh.upper()
+    self.blanks_cls = self.blanks_sh / f'{shyear.upper()}{group.upper()}'
+    self.blanks_dir = self.blanks_cls
+    self.order_format = 'json'
+    self.orders_dir = settings.MEDIA_ROOT / 'orders'
+
+  @property
+  def is_closed(self):
+    return (self.blanks_cls / 'closed').is_file()
+
+  @property
+  def blanks(self):
+    style = ""
+    goods = self.get_empty_goods()
+    for gname, part in goods.items():
+      if gname == 'BONUS': continue
+      if 'blank_img_style' in part:
+        style = part['blank_img_style']
+        break
+
+    return [{
+      'uuid': i.name,
+      'blk': next(i.iterdir()).name,
+      'style': style,
+    } for i in self.blanks_dir.iterdir() if i.is_dir()]
+
+  def get_imgname(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_imgname'
+    return next((self.blanks_dir / str(uuid)).glob('*.jpg')).name
+
+  def get_img(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_img'
+    filename = self.get_imgname(uuid)
+    return filename.rsplit('.', 1)[0].rsplit('_', 1)[-1]
+
+  @lru_cache
+  def get_order_file(self, uuid=None, skip_check=False):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_order_file'
+    f = self.orders_dir / f'{self.session}__{self.get_imgname(uuid).split(".")[0]}.{self.order_format}'
+    return skip_check and f or f.is_file() and f or None
+
+  def save_order(self, order, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.save_order'
+    f = self.get_order_file(uuid, True)
+    save_order(f, order, self.order_format)
+
+  @lru_cache
+  def get_order(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_order'
+    order_file = self.get_order_file(uuid)
+    if not order_file:
+      return None
+    return read_order(order_file, format=self.order_format)
+
+  @lru_cache
+  def get_pricename(self, uuid=None):
+    for lvl, i in [
+      ('cls', self.blanks_cls),
+      ('sh', self.blanks_sh),
+      ('ses', self.blanks_ses),
+      ('top', self.blanks_top),
+    ]:
+      f = i / 'price'
+      if f.is_file():
+        return f.read_text().strip()
+
+    return 'default'
+
+  def get_pricefile(self, uuid=None):
+    trg = None
+    if uuid:
+      trg = self.blanks_dir / str(uuid) / 'price.json'
+    if not trg or not trg.is_file():
+      trg = self.blanks_dir / 'price.json'
+    if not trg.is_file():
+      trg = self.blanks_sh / 'price.json'
+    if not trg.is_file():
+      trg = self.blanks_top / 'price.json'
+    if not trg.is_file():
+      return None
+
+  def get_empty_goods(self, uuid=None):
+    uuid = uuid or self.uuid
+    # assert uuid, 'no uuid in album.get_empty_goods'
+    pricename = self.get_pricename(uuid)
+    return deepcopy(PRICELISTS.get(pricename))
+
+  @lru_cache
+  def get_goods(self, uuid=None, post_data=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_goods'
+    goods = self.get_empty_goods(uuid)
+    data = self.get_order(uuid)
+
+    if data:
+      for good_name, amounts in goods.items():
+        if good_name == 'BONUS': continue
+        for name, item in amounts['amounts'].items():
+          item["q"] = data.get(f'{good_name}_{name}', 0)
+
+    if post_data:
+      for good_name, part in goods.items():
+        if good_name == 'BONUS': continue
+        for line_name, item in part['amounts'].items():
+          k = f'{good_name}_{line_name}'
+          v = next((j for i,j in post_data if i == k), None)
+          if v is not None:
+            item['q'] = v
+
+    return goods
+
+  def get_blank_url(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'no uuid in album.get_blank_url'
+    return f"/media/blanks/{self.session}/{self.sh.upper()}/{self.shyear}{self.group}/{uuid}/{self.get_imgname(uuid)}"
+
+  @classmethod
+  def get_albums(cls):
+    res = []
+    for SES in BLANKS.iterdir():
+      if not SES.is_dir(): continue
+      for SH in SES.iterdir():
+        if not SH.is_dir(): continue
+        for ALB in SH.iterdir():
+          if not ALB.is_dir(): continue
+          res.append(Album(SES.name, SH.name, ALB.name[:-1], ALB.name[-1:], None, None))
+
+    res.sort(key=lambda a: (a.session, a.sh, int(a.shyear), a.group.upper()))
+
+    return res
+
+  @property
+  def ordered_count(self):
+    return len([None for i in self.orders_dir.iterdir() if i.name.startswith(f'{self.sign}_') and self.order_cost(i)])
+
+  @property
+  def blanks_count(self):
+    return len([None for i in self.blanks_dir.iterdir() if i.is_dir()])
+
+  @classmethod
+  def order_cost(cls, path):
+    # TODO:
+    return 1000
+
+  @property
+  def order_progress(self):
+    return self.ordered_count / self.blanks_count * 100
+
+  @property
+  def name(self):
+    return f'{self.sh}_{self.shyear}{self.group}'
+
+  @property
+  def id(self):
+    return f'{self.session}__{self.name}'
+
+  @property
+  def sign(self):
+    return signer.sign(self.id)
+
+  def get_json(self):
+    return {
+      'id': self.id,
+      'name': self.name,
+      'sh': self.sh,
+      'cls': f'{self.shyear}{self.group}',
+      'sign': self.sign,
+      'signed_url': self.signed_url,
+      'blanks_count': self.blanks_count,
+      'ordered_count': self.ordered_count,
+      'order_progress': self.order_progress,
+      'closed': self.is_closed,
+      'is_closed': self.is_closed,
+    }
+
+  @property
+  def signed_url(self):
+    return self.sign
+
+  def cancel_order(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid, 'not uuid in album.cancel_order'
+    # delete order.json
+    order_file = self.get_order_file(uuid)
+    if order_file.is_file():
+      order_file.unlink()
+      return
+    return 'Not a file'
+
+def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, imgn=None):
+  '''uuid like 7f094d61-bb45-4375-81fe-32fcbb383d5c'''
+
+  shyear = str(shyear)
+
+  if sh is None:
+    return render(request, 'zakaz_index.html', {
+      'schools': sorted([ {"name":i.name,"title":f"Школа {i.name}"} for i in (settings.MEDIA_ROOT / 'blanks').iterdir()], key=itemgetter('name')),
+    })
+
+  if shyear is None or group is None:
+    return render(request, 'zakaz_index.html', {
+      's': sh,
+      'classes': sorted([ i.name for i in (settings.MEDIA_ROOT / 'blanks' / sh).iterdir()], key=lambda i: int(i[:-1])*1000+ord(i[-1].upper())),
+    })
+
+  album = Album(session, sh, shyear, group, uuid, imgn)
+
+  if uuid is None:
+
+    return render(request, 'zakaz_index.html', {
+      "ses": session,
+      'session':session,
+      "sh": sh,
+      "shyear": shyear,
+      'year': shyear,
+      "group": group,
+      "cls": f'{shyear}{group}',
+      # "c": cls,
+      # 'blanks': blanks,
+      'blanks': album.blanks,
+      'album': album,
+    })
+
+  # ZAKAZ
+
+  contacts = ContactInfoForm(request.POST or album.get_order() or None)
+
+  order = None
+
   if request.method == 'POST':
+    order = dict(i for i in request.POST.items() if i[0] not in ['csrfmiddlewaretoken', 'action'] and i[1] != '0')
+
     if contacts.is_valid():
 
-      order = {k:v for k,v in data.items() if k != 'csrfmiddlewaretoken' and v != '0'}
-      print('[imgname]', imgname)  # 158_1И_8810.jpg
-      print('[order]', order)  # {'vint_tshirt': '1', 'tel': 'test', 'mail': 'test@test.ru', 'name': 'test'}
+      action = request.POST.get('action')
+      message = ''
 
-      # TODO save order
-      save_order(order_file, order, format=order_format)
+      if action == 'save':
+        album.save_order(order)
+        message = 'Спасибо за заказ!'
 
-      return render(request, 'zakaz_index.html', {'message': 'Спасибо за заказ!'})
+      elif action == 'cancel_order':
+        album.cancel_order()
+        message = 'Заказ отменен!'
+
+      return render(
+        request, 'zakaz_index.html',
+        {'message': message},
+      )
 
     else:
       # import ipdb;ipdb.set_trace()
       print('NOT VALID ContactInfoForm')
+      print(contacts.errors)
 
   return render(request, 'zakaz.html', {
-    "goods": goods,
-    "blank": f"/media/blanks/{sh.upper()}/{cls.upper()}/{uuid}/{imgname}",
+    "goods": album.get_goods(post_data=tuple(order.items()) if order else None),
+    "blank": album.get_blank_url(),
     "contacts": contacts,
-    "prices": PRICES,
-    "closed": closed,
+    "album": album,
   })
 
 
@@ -382,30 +667,30 @@ def load_album(ALBUM):
 def upload(request):
   form = UploadBlanksForm(request.POST, request.FILES)
   if form.is_valid():
+    ses = form.cleaned_data['session']
     sh = form.cleaned_data['sh'].upper()
     yr = form.cleaned_data["yr"]
     gr = form.cleaned_data["gr"][0].lower().translate(ru).upper()
 
-    ALBUM = BLANKS / sh / f'{yr}{gr}'
+    ALBUM = BLANKS / ses / sh / f'{yr}{gr}'
     ALBUM.mkdir(parents=True, exist_ok=True)
 
     existing_file_dirs = {}
     for file_dir in ALBUM.iterdir():
       if not file_dir.is_dir():continue
       for f in file_dir.iterdir():
-        img = f.name.split('.')[0].split('_')[-1]
+        img = f.name.rsplit('.',1)[0]
         existing_file_dirs[img] = [file_dir, f]
 
     for file in request.FILES.getlist('files'):
-      img, ext = file.name.split('.')
-      img = img.split('_')[-1]
+      img, ext = file.name.rsplit('.', 1)
       exist_file_dir, exist_trg_file = existing_file_dirs.get(img) or [None, None]
       if exist_file_dir:
         file_dir = exist_file_dir
       else:
         file_dir = ALBUM / str(uuid4())
         file_dir.mkdir()
-      trg_file = file_dir / f'{sh}_{yr}{gr}_{img}.{ext}'
+      trg_file = file_dir / f'{img}.{ext}'
       if trg_file.exists():
         trg_file.unlink()
       with trg_file.open('wb') as f:
@@ -413,8 +698,9 @@ def upload(request):
           f.write(ch)
 
   if request.POST.get('ajax') == 'true':
-    album_data = load_album(ALBUM)
-    return JsonResponse({'data': album_data})
+    # album_data = load_album(ALBUM)
+    album = Album(ses, sh, yr, gr, None, None)
+    return JsonResponse({'data': album.get_json()})
 
 
 def upload_blanks(request, edit=False):
@@ -423,7 +709,8 @@ def upload_blanks(request, edit=False):
   if request.method == 'POST':
     log('[ upload_blanks POST ]', request.POST)
     action = request.POST.get('action')
-    sh = cls = ALBUM = None
+    session = sh = cls = ALBUM = None
+
     if 'link' in request.POST:
       sh, cls = request.POST['link'].split(':')[0].split('_')
       ALBUM = BLANKS / sh / cls
@@ -450,18 +737,10 @@ def upload_blanks(request, edit=False):
       if closed.is_file():
         closed.unlink()
 
-  albums = []
-  for SH in BLANKS.iterdir():
-    if not SH.is_dir():continue
-    for ALBUM in SH.iterdir():
-      if not ALBUM.is_dir():continue
-      albums.append(load_album(ALBUM))
-  albums.sort(key=lambda d: (d['sh'], int(d['cls'][:-1]), d['cls'][-1]))
-
   return render(request, 'upload_blanks.html', {
     'form': form,
     'edit': edit,
-    'albums': albums,
+    'albums': Album.get_albums(),
   })
 
 

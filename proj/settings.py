@@ -123,9 +123,6 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / "static"
-#STATICFILES_DIRS = [
-#    BASE_DIR / "static",
-#]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -140,3 +137,14 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'foto.backends.UserBackend',
 ]
+
+try:
+    from .settings_local import *
+except ImportError:
+    pass
+
+
+try:
+    from .local_settings import *
+except ImportError:
+    pass

@@ -41,6 +41,7 @@ class ContactInfoForm(forms.Form):
 
 
 class UploadBlanksForm(forms.Form):
+  session = forms.CharField(label='съемка', required=True)
   sh = forms.CharField(label='SH', required=True)
   # yr = forms.CharField(label='YR', required=True)
   yr = forms.ChoiceField(label="Год", required=True, choices=[

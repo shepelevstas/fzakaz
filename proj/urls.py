@@ -6,8 +6,9 @@ from django.conf.urls.static import static
 from foto import views
 
 urlpatterns = [
-    path('zakaz/<str:sh>/<str:cls>/<uuid:uuid>/', views.zakaz, name='zakaz'),
-    path('<str:sh>_<int:year><str:group>:<str:code>/', views.signed_view, name="signed_view"),
+    path('zakaz/<str:session>__<str:sh>_<int:shyear><str:group>/<uuid:uuid>/', views.zakaz, name='zakaz'),
+
+    path('<str:session>__<str:sh>_<int:year><str:group>:<str:code>/', views.signed_view, name="signed_view"),
 
     # http://83.220.168.4/4_1%D0%90:agBVmO1xRZTnMNNwoXg8UBidjXaAv8MSLV0TsdV_gmA/
     path('upload_blanks/7f094d61-bb45-4375-81fe-32fcbb383d5c/', views.upload_blanks, name='upload_blanks'),
