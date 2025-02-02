@@ -488,12 +488,14 @@ class Album:
     return f"/media/blanks/{self.session}/{self.sh.upper()}/{self.shyear}{self.group}/{uuid}/{self.get_imgname(uuid)}"
 
   @classmethod
-  def get_albums(cls):
+  def get_albums(cls, ses=None, sh=None):
     res = []
     for SES in BLANKS.iterdir():
       if not SES.is_dir(): continue
+      if ses and SES.name != ses: continue
       for SH in SES.iterdir():
         if not SH.is_dir(): continue
+        if sh and SH.name != sh: continue
         for ALB in SH.iterdir():
           if not ALB.is_dir(): continue
           res.append(Album(SES.name, SH.name, ALB.name[:-1], ALB.name[-1:], None, None))
@@ -740,10 +742,13 @@ def upload_blanks(request, edit=False):
       if closed.is_file():
         closed.unlink()
 
+  ses = request.GET.get('ses')
+  sh = request.GET.get('sh')
+
   return render(request, 'upload_blanks.html', {
     'form': form,
     'edit': edit,
-    'albums': Album.get_albums(),
+    'albums': Album.get_albums(ses, sh),
   })
 
 
