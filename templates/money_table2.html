@@ -15,7 +15,7 @@
         <thead>
           <tr class="text-center">
             <th class="position-sticky start-0"></th>
-            <th class="position-sticky border-end" style="left:30px;"></th>
+            <th class="position-sticky border-end" style="left:34px;"></th>
             <th>Сумма</th>
 
             {% for item, col in album.get_money_table.cols.items %}
@@ -29,7 +29,7 @@
 
           <tr class="text-center">
             <th class="position-sticky start-0">№</th>
-            <th class="position-sticky border-end" style="left:30px;">Бланк</th>
+            <th class="position-sticky border-end" style="left:34px;">Бланк</th>
             <th>{{album.get_money_table.total}}₽</th>
 
             {% for item, col in album.get_money_table.cols.items %}
@@ -40,7 +40,7 @@
           {% for img, row in album.get_money_table.rows.items %}
             <tr class="text-center">
               <td class="position-sticky start-0">{{forloop.counter}}</td>
-              <td class="position-sticky border-end" style="left:30px;">{{img}}</td>
+              <td class="position-sticky border-end" style="left:34px;">{{img}}</td>
               <td>{{row.total}}₽</td>
               {% for item in album.get_money_table.cols %}
                 <td>{{row|lookup:item|default:""}}</td>

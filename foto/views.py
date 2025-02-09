@@ -619,6 +619,9 @@ class Album:
         row['total'] += q * price
         total += q * price
 
+    cols = dict(sorted((i for i in cols.items()), key=lambda i:i[1]['title']))
+    rows = dict(sorted((i for i in rows.items()), key=lambda i:i[0]))
+
     return {
       'cols': cols,
       'rows': rows,
