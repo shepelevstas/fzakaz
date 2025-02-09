@@ -392,10 +392,17 @@ class Album:
       'style': style,
     } for i in self.blanks_dir.iterdir() if i.is_dir()]
 
+  @lru_cache
+  def get_blank_file(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid
+    return next((self.blanks_dir / str(uuid)).glob('*.jpg'))
+
   def get_imgname(self, uuid=None):
     uuid = uuid or self.uuid
     assert uuid, 'no uuid in album.get_imgname'
-    return next((self.blanks_dir / str(uuid)).glob('*.jpg')).name
+    return self.get_blank_file(uuid).name
+    # return next((self.blanks_dir / str(uuid)).glob('*.jpg')).name
 
   def get_img(self, uuid=None):
     uuid = uuid or self.uuid
@@ -407,13 +414,29 @@ class Album:
   def get_order_file(self, uuid=None, skip_check=False):
     uuid = uuid or self.uuid
     assert uuid, 'no uuid in album.get_order_file'
-    f = self.orders_dir / f'{self.session}__{self.get_imgname(uuid).split(".")[0]}.{self.order_format}'
-    return skip_check and f or f.is_file() and f or None
+
+    f = self.get_order_file2(uuid, skip_check)
+
+    if skip_check:
+      return f
+
+    if not f.is_file():
+      f = self.orders_dir / f'{self.session}__{self.get_imgname(uuid).split(".")[0]}.{self.order_format}'
+
+    return f.is_file() and f or None
+
+  @lru_cache
+  def get_order_file2(self, uuid=None, skip_check=False):
+    uuid = uuid or self.uuid
+    assert uuid
+    return self.orders_dir / self.session / self.sh / f'{self.shyear}{self.group}' / (self.get_blank_file(uuid).stem + '.json')
 
   def save_order(self, order, uuid=None):
     uuid = uuid or self.uuid
     assert uuid, 'no uuid in album.save_order'
     f = self.get_order_file(uuid, True)
+    if not f.parent.is_dir():
+      f.parent.mkdir(parents=True, exist_ok=True)
     save_order(f, order, self.order_format)
 
   @lru_cache
@@ -439,6 +462,7 @@ class Album:
 
     return 'default'
 
+  # TODO
   def get_pricefile(self, uuid=None):
     trg = None
     if uuid:
@@ -505,15 +529,17 @@ class Album:
     return res
 
   @property
+  @lru_cache
   def ordered_count(self):
-    return len([
-      None for i in self.orders_dir.iterdir()
-      if i.name.startswith(f'{self.id}_')  # and self.order_cost(i)
+    return sum([
+      self.get_order_file(uudir.name) is not None
+      for uudir in self.blanks_dir.iterdir() if uudir.is_dir()
     ])
 
   @property
+  @lru_cache
   def blanks_count(self):
-    return len([None for i in self.blanks_dir.iterdir() if i.is_dir()])
+    return sum([uudir.is_dir() for uudir in self.blanks_dir.iterdir()])
 
   @classmethod
   def order_cost(cls, path):
@@ -555,6 +581,50 @@ class Album:
   def signed_url(self):
     return self.sign
 
+  @property
+  def money_table_url(self):
+    sign = signer.sign(self.id)
+    adr, code = sign.split(':')
+    return f'{code}/{adr}/money_table/'
+
+  @lru_cache
+  def get_money_table(self):
+    blanks = {
+      next(uudir.glob('*.jpg')).stem: self.get_order(uudir.name)
+      for uudir in self.blanks_dir.iterdir() if uudir.is_dir()
+    }
+
+    pricelist = self.get_empty_goods()
+
+    cols = {}
+    rows = {}
+    total = 0
+
+    for img, b in blanks.items():
+      if b is None: continue
+      for item, q in b.items():
+        if '_' not in item: continue
+        col_k, row_k = item.split('_')
+        if row_k == 'tsize': continue
+        if col_k not in pricelist: continue
+        col_data = pricelist[col_k]
+        if row_k not in col_data['amounts']: continue
+        row_data = col_data['amounts'][row_k]
+        price = row_data["price"]
+        col = cols.setdefault(item, {'q': 0, 'title': f'{row_data["title"]} "{col_data["title"]}" ({price}₽)'})
+        q = int(q)
+        col['q'] += q
+        row = rows.setdefault(img, {'total': 0, 'title': img})
+        row[item] = q
+        row['total'] += q * price
+        total += q * price
+
+    return {
+      'cols': cols,
+      'rows': rows,
+      'total': total,
+    }
+
   def cancel_order(self, uuid=None):
     uuid = uuid or self.uuid
     assert uuid, 'not uuid in album.cancel_order'
@@ -564,6 +634,7 @@ class Album:
       order_file.unlink()
       return
     return 'Not a file'
+
 
 def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, imgn=None):
   '''uuid like 7f094d61-bb45-4375-81fe-32fcbb383d5c'''
@@ -745,14 +816,27 @@ def upload_blanks(request, edit=False):
   ses = request.GET.get('ses')
   sh = request.GET.get('sh')
 
-  return render(request, 'upload_blanks.html', {
+  return render(request, 'manage_blanks.html', {
     'form': form,
     'edit': edit,
     'albums': Album.get_albums(ses, sh),
   })
 
 
-def money_table(request, sh, year, group, code):
+def money_table2(req, session, sh, shyear, group, code):
+  shyear = str(shyear)
+  sign = f'{session}__{sh}_{shyear}{group}'
+  try:
+    assert sign == signer.unsign(f'{sign}:{code}')
+  except (BadSignature, AssertionError):
+    return HttpResponse('Страница не найдена')
+
+  album = Album(session, sh, shyear, group)
+
+  return render(req, 'money_table2.html', {'album':album})
+
+
+def money_table(request, session, sh, shyear, group, code):
 
   sign = f'{sh}_{year}{group}:{code}'
   cls = f'{year}{group.upper()}'

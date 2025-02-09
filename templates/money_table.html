@@ -44,19 +44,19 @@
           <tr>
             <td class="text-nowrap">
               {% if file.uuid %}
-                <a href="{% url 'zakaz' sh cls file.uuid %}">{{file|dict_get:'img'}}</a>
+                <a href="{% url 'zakaz' sh cls file.uuid %}">{{file|lookup:'img'}}</a>
               {% else %}
-                {{file|dict_get:'img'}}
+                {{file|lookup:'img'}}
               {% endif %}
             </td>
 
-            <td>{{file|dict_get:'name'}}</td>
+            <td>{{file|lookup:'name'}}</td>
 
             {% for nm,ru in names %}
-              <td class="text-center">{{file|dict_get:nm|default_if_none:'-'}}</td>
+              <td class="text-center">{{file|lookup:nm|default_if_none:'-'}}</td>
             {% endfor %}
 
-            <td class="text-center">{{file|dict_get:'sum'}}</td>
+            <td class="text-center">{{file|lookup:'sum'}}</td>
           </tr>
         {% endfor %}
       </tbody>

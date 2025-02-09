@@ -1,7 +1,7 @@
 {% load mytags %}
 
 <div class="d-inline-flex">
-  <span class="btn badge rounded-0 text-bg-success">{{ users|dict_get:item_user }}</span>
+  <span class="btn badge rounded-0 text-bg-success">{{ users|lookup:item_user }}</span>
 
   <span class="btn badge rounded-0 text-bg-danger px-1"
     hx-post="{{request.path}}"

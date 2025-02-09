@@ -17,7 +17,17 @@
       <form id="upload_form" action="." method="post" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center">
         {% csrf_token %}
 
-        {% for f in form %}{{f.label}}:{{f}}{% endfor %}
+        {% for f in form %}
+          {% if f.name == 'files' %}
+            <label>
+              <span id="id_select_files_btn" class="btn btn-success">Выбрать файлы</span>
+              {{f}}
+              {% comment %} <div class="d-none"></div> {% endcomment %}
+            </label>
+          {% else %}
+            {{f.label}}:{{f}}
+          {% endif %}
+        {% endfor %}
 
         <button type='submit' name='action' value='upload' class="btn btn-primary">upload</button>
 
@@ -43,14 +53,18 @@
           <td class="ps-2 ps-lg-4">
             {{album.session}}
           </td>
+
           <td class="text-center">
             <a href="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" class="">
               {{album.name}}
             </a>
-            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" title="Copy">
+            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" title="Копировать ссылку">
               <i class="bi bi-copy"></i>
             </button>
             {% comment %} <a href="{{request.scheme}}://{{request.get_host}}/money_table/{{album.signed_url}}" class="btn btn-sm"><i class="bi bi-table"></i></a> {% endcomment %}
+            <a href="{{request.scheme}}://{{request.get_host}}/{{album.money_table_url}}">
+              <i class="bi bi-table"></i>
+            </a>
             {% if album.is_closed %}<strong class="text-secondary">ЗАКРЫТ</strong>{% endif %}
           </td>
 
@@ -342,6 +356,16 @@
             //done.textContent = `${que_done.length} / ${que.length}`
           })
         }
+      })
+
+      document.querySelectorAll('#id_files').forEach(el => {
+        el.addEventListener('change', ev => {
+          document.querySelectorAll('#id_select_files_btn').forEach(btn => {
+            btn.textContent = el.files.length
+              ? `Выбрано файлов: ${el.files.length}`
+              : 'Выбрать файлы'
+          })
+        })
       })
     });
   </script>

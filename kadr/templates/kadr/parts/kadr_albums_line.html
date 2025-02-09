@@ -29,13 +29,13 @@
         {% for item in items %}
 
           <div class="d-inline-flex">
-            <a href="{{i.signed_url|dict_get:item.name}}"
+            <a href="{{i.signed_url|lookup:item.name}}"
               class="btn badge rounded-pill rounded-end-0 text-bg-primary">
               {{item.ru}}
             </a>
 
             <!-- USER SELECT -->
-            {% with i.item_user|dict_get:item.name as item_user %}
+            {% with i.item_user|lookup:item.name as item_user %}
               {% if item_user %}
                 {% include 'kadr/parts/kadr_albums_line_unset_exec.html' %}
               {% else %}
@@ -50,7 +50,7 @@
                 <li><span class="dropdown-item-text">{{group.ru}}</span></li>
 
                 {% for mi in group.menu %}
-                  {% with i.offer|dict_get:group.name|dict_get:item.name as mi_list %}
+                  {% with i.offer|lookup:group.name|lookup:item.name as mi_list %}
                     <li><a href="#" class="dropdown-item"
                       hx-post="{{request.path}}"
                       hx-vals='{"album": "{{i.album}}", "item": "{{item.name}}", "group": "{{group.name}}", "action": "{% if mi.name in mi_list %}remove{% else %}add{% endif %}", "menu_item_name": "{{mi.name}}", "menu_item_ru": "{{mi.ru}}"}'

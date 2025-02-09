@@ -19,6 +19,8 @@ urlpatterns = [
 
     path('money_table/<str:sh>_<int:year><str:group>:<str:code>/', views.money_table, name='money_table'),
 
+    path('<str:code>/<str:session>__<str:sh>_<int:shyear><str:group>/money_table/', views.money_table2, name='money_table2'),
+
     path('download_orders/<str:sh_cls>:<str:code>/', views.download_orders, name='download_orders'),
 
     # kadr
