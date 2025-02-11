@@ -536,6 +536,7 @@ class Album:
 
       for item, q in b.items():
         if '_' not in item: continue
+        if not q: continue
         col_k, row_k = item.split('_')
         if row_k == 'tsize':
           row['tsize'] = q

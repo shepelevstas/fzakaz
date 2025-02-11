@@ -187,7 +187,7 @@ def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, im
   order = None
 
   if request.method == 'POST':
-    order = dict(i for i in request.POST.items() if i[0] not in ['csrfmiddlewaretoken', 'action'] and i[1] != '0')
+    order = dict(i for i in request.POST.items() if i[0] not in ['csrfmiddlewaretoken', 'action'] and i[1] and i[1] != '0')
 
     if contacts.is_valid():
 
