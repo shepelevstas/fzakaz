@@ -19,7 +19,7 @@
             <th>Сумма</th>
 
             {% for item, col in album.get_money_table.cols.items %}
-              <th>{{col.title}}</th>
+              <th>{{col.format}} "{{col.theme}}" ({{col.price}}₽)</th>
             {% endfor %}
 
           </tr>
@@ -40,10 +40,14 @@
           {% for img, row in album.get_money_table.rows.items %}
             <tr class="text-center">
               <td class="position-sticky start-0">{{forloop.counter}}</td>
-              <td class="position-sticky border-end" style="left:34px;">{{img}}</td>
+              <td class="position-sticky border-end" style="left:34px;">
+                <a href="{% url 'zakaz' album.session album.sh album.shyear album.group row.uuid %}">
+                  {{img}}
+                </a>
+              </td>
               <td>{{row.total}}₽</td>
               {% for item in album.get_money_table.cols %}
-                <td>{{row|lookup:item|default:""}}</td>
+                <td>{{row.items|lookup:item|default:""}}</td>
               {% endfor %}
             </tr>
           {% endfor %}

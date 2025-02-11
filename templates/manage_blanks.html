@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% load static %}
+{% load static mytags %}
 
 {% block title %}fZ - albums{% endblock title %}
 
@@ -38,6 +38,23 @@
     </div>
   {% endif %}
 
+  <div class="container-fluid py-2">
+
+    {% getlist request.GET 'ses' as ses_list %}
+    {% for ses in ses_list %}
+      <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses }}" class="btn btn-sm btn-outline-primary rounded-pill">
+        <i class="bi bi-x-circle-fill"></i> Съемка: {{ses}}
+      </a>
+    {% endfor %}
+
+    {% getlist request.GET 'sh' as sh_list %}
+    {% for sh in sh_list %}
+      <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh }}" class="btn btn-sm btn-outline-primary rounded-pill">
+        <i class="bi bi-x-circle-fill"></i> Школа: {{sh}}
+      </a>
+    {% endfor %}
+  </div>
+
   <table class="table table-sm bg-white">
     <thead>
       <th class="ps-2 ps-lg=4">съемка</th>
@@ -49,12 +66,25 @@
     <tbody id="album_items">
 
       {% for album in albums %}
-        <tr data-album="{{album.id}}" class="align-middle">
+        <tr data-album="{{album.id}}" class="align-middle {% if album.is_deleted %}text-decoration-line-through{% endif %}">
+          {# SESSION #}
           <td class="ps-2 ps-lg-4">
             {{album.session}}
+            {% if 'ses' not in request.GET %}
+              <a href="{{request.get_full_path|add_q_param:'ses'|add_q_value:album.session}}">
+                <i class="bi bi-funnel"></i>
+              </a>
+            {% endif %}
           </td>
 
+          {# ALBUM #}
           <td class="text-center">
+            {% if 'sh' not in request.GET %}
+              <a href="{{request.get_full_path|add_q_param:'sh'|add_q_value:album.sh}}">
+                <i class="bi bi-funnel"></i>
+              </a>
+            {% endif %}
+
             <a href="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" class="">
               {{album.name}}
             </a>
@@ -65,9 +95,16 @@
             <a href="{{request.scheme}}://{{request.get_host}}/{{album.money_table_url}}">
               <i class="bi bi-table"></i>
             </a>
-            {% if album.is_closed %}<strong class="text-secondary">ЗАКРЫТ</strong>{% endif %}
+
+            {% if album.is_closed %}
+              <a href="{% url 'orders_file' album.sign %}" title="Скачать таблицу заказов">
+                <i class="bi bi-box-arrow-down"></i>
+              </a>
+              <strong class="text-secondary">ЗАКРЫТ</strong>
+            {% endif %}
           </td>
 
+          {# PROGRESS #}
           <td class="text-center">
             <span class="item_count">{{album.ordered_count}} / {{album.blanks_count}}</span>
             <div class="progress rounded-pill" style="height:10px;">
@@ -75,23 +112,30 @@
             </div>
           </td>
 
+          {# ACTIONS #}
           <td class="text-center pe-2 pe-lg-4">
-            {% comment %} <form action="." method="post" class="action_form d-inline-block">
+            <form action="." method="post" class="action_form d-inline-block">
               {% csrf_token %}
-              <input type="hidden" name="link" value="{{album.signed_url}}"/>
+              <input type="hidden" name="album_sign" value="{{album.sign}}"/>
 
               {% if edit %}
-                <button class="btn btn-outline-danger btn-sm" type="submit" name='action' value="delete">
-                  <i class="bi bi-trash-fill"></i>
-                </button>
+                {% if album.is_deleted %}
+                  <button class="btn btn-outline-success btn-sm" type="submit" name="action" value="undelete" title="Восстановить">
+                    <i class="bi bi-recycle"></i>
+                  </button>
+                {% else %}
+                  <button class="btn btn-outline-danger btn-sm" type="submit" name='action' value="delete" title="Удалить">
+                    <i class="bi bi-trash-fill"></i>
+                  </button>
+                {% endif %}
               {% endif %}
 
               {% if album.is_closed %}
-                <button class="btn btn-link btn-sm" type="submit" name="action" value="open">Открыть</button>
+                <button class="btn btn-link btn-sm" type="submit" name="action" value="unclose">Открыть</button>
               {% else %}
                 <button class="btn btn-link btn-sm" type="submit" name="action" value="close">Закрыть</button>
               {% endif %}
-            </form> {% endcomment %}
+            </form>
           </td>
         </tr>
       {% endfor %}

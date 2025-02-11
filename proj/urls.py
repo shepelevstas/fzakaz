@@ -23,6 +23,8 @@ urlpatterns = [
 
     path('download_orders/<str:sh_cls>:<str:code>/', views.download_orders, name='download_orders'),
 
+    path('<str:sign>/orders_file/', views.orders_file, name='orders_file'),
+
     # kadr
     path('kadr/', include('kadr.urls')),
 
