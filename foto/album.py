@@ -8,6 +8,10 @@ from django.utils import timezone as tz
 
 from utils.io import save_order, read_order
 
+try:
+  import zoneinfo
+except ImportError:
+  from backports import zoneinfo
 
 
 signer = Signer()
@@ -355,7 +359,7 @@ class Album:
     f = self.get_order_file(uuid, True)
     if not f.parent.is_dir():
       f.parent.mkdir(parents=True, exist_ok=True)
-    zone = tz.zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
+    zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
     data = tz.now().replace(microsecond=0).astimezone(zone).isoformat()
     order['date'] = date
     save_order(f, order, self.order_format)
