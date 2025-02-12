@@ -360,7 +360,7 @@ class Album:
     if not f.parent.is_dir():
       f.parent.mkdir(parents=True, exist_ok=True)
     zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
-    data = tz.now().replace(microsecond=0).astimezone(zone).isoformat()
+    date = tz.now().replace(microsecond=0).astimezone(zone).isoformat()
     order['date'] = date
     save_order(f, order, self.order_format)
 
