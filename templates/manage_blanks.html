@@ -13,7 +13,7 @@
 
 {% block content %}
   {% if edit %}
-    <div class="position-sticky top-0 shadow bg-white p-2">
+    <div class="position-sticky top-0 shadow bg-white p-2 z-1">
       <form id="upload_form" action="." method="post" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center">
         {% csrf_token %}
 
@@ -42,16 +42,20 @@
 
     {% getlist request.GET 'ses' as ses_list %}
     {% for ses in ses_list %}
-      <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses }}" class="btn btn-sm btn-outline-primary rounded-pill">
-        <i class="bi bi-x-circle-fill"></i> Съемка: {{ses}}
-      </a>
+      {% if ses %}
+        <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses }}" class="btn btn-sm btn-outline-primary rounded-pill">
+          <i class="bi bi-x-circle-fill"></i> Съемка: {{ses}}
+        </a>
+      {% endif %}
     {% endfor %}
 
     {% getlist request.GET 'sh' as sh_list %}
     {% for sh in sh_list %}
-      <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh }}" class="btn btn-sm btn-outline-primary rounded-pill">
-        <i class="bi bi-x-circle-fill"></i> Школа: {{sh}}
-      </a>
+      {% if sh %}
+        <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh }}" class="btn btn-sm btn-outline-primary rounded-pill">
+          <i class="bi bi-x-circle-fill"></i> Школа: {{sh}}
+        </a>
+      {% endif %}
     {% endfor %}
   </div>
 
@@ -67,10 +71,11 @@
 
       {% for album in albums %}
         <tr data-album="{{album.id}}" class="align-middle {% if album.is_deleted %}text-decoration-line-through{% endif %}">
+
           {# SESSION #}
           <td class="ps-2 ps-lg-4">
             {{album.session}}
-            {% if 'ses' not in request.GET %}
+            {% if 'ses' not in request.GET or not request.GET.ses %}
               <a href="{{request.get_full_path|add_q_param:'ses'|add_q_value:album.session}}">
                 <i class="bi bi-funnel"></i>
               </a>
@@ -79,7 +84,7 @@
 
           {# ALBUM #}
           <td class="text-center">
-            {% if 'sh' not in request.GET %}
+            {% if 'sh' not in request.GET or not request.GET.sh %}
               <a href="{{request.get_full_path|add_q_param:'sh'|add_q_value:album.sh}}">
                 <i class="bi bi-funnel"></i>
               </a>
@@ -114,7 +119,7 @@
 
           {# ACTIONS #}
           <td class="text-center pe-2 pe-lg-4">
-            <form action="." method="post" class="action_form d-inline-block">
+            <form action="{{request.get_full_path}}" method="post" class="action_form d-inline-block">
               {% csrf_token %}
               <input type="hidden" name="album_sign" value="{{album.sign}}"/>
 
