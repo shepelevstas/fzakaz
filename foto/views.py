@@ -462,7 +462,6 @@ def download_orders(request, sh_cls, code):
     img = file.name.split('.')[0].split('_')[-1]
     data = read_order(file)
     content.append([
-      file.name,
       img,
       data['name'],
       f'{data["tel"]},{data["mail"]}',
