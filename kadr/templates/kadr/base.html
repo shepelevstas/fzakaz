@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KADR</title>
+
+  <link rel="stylesheet" href="/static/css/bootstrap53a.min.css">
+  <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
+  {% block css %}{% endblock css %}
+</head>
+<body class="{% block bodyclass %}bg-body-secondary{% endblock bodyclass %}">
+  {% block content %}
+    <h2>Base content block</h2>
+  {% endblock content %}
+
+  {% block js_libs %}
+    <script src="/static/js/bootstrap53a.bundle.min.js"></script>
+  {% endblock js_libs %}
+  {% block js %}{% endblock js %}
+</body>
+</html>

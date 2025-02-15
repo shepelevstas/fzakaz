@@ -23,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-n++z(o=9%+@q8o21@i%)9#wm3w!(o_f+ql&=%mj-)!x)g)d58='
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['localhost','127.0.0.1','83.220.168.4', 'shepelevstas.fvds.ru']
 
 
 # Application definition
@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'foto',
+    'kadr',
+    'play',
 ]
 
 MIDDLEWARE = [
@@ -120,9 +122,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATIC_ROOT = BASE_DIR / "static"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -137,3 +137,14 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'foto.backends.UserBackend',
 ]
+
+try:
+    from .settings_local import *
+except ImportError:
+    pass
+
+
+try:
+    from .local_settings import *
+except ImportError:
+    pass

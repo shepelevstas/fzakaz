@@ -1,0 +1,12 @@
+{% load mytags %}
+
+<div class="d-inline-flex">
+  <span class="btn badge rounded-0 text-bg-success">{{ users|lookup:item_user }}</span>
+
+  <span class="btn badge rounded-0 text-bg-danger px-1"
+    hx-post="{{request.path}}"
+    hx-target="closest div"
+    hx-swap="outerHTML"
+    hx-vals='js:{"album":"{{i.album}}","item":"{{item.name}}","action":"unset_exec","value":"{{item_user}}"}'
+  ><i class="bi bi-x-lg"></i></span>
+</div>

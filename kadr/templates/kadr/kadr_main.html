@@ -1,0 +1,1734 @@
+{% extends 'kadr/base.html' %}
+
+{% load static %}
+
+{% block bodyclass %}vh-100 overflow-y-hidden{% endblock bodyclass %}
+
+{% block content %}
+  <div class="user-select-none" style="height:100px;">
+    <div class="position-sticky top-0 shadow bg-white p-2">
+      {% if not signed %}
+        <a href="{% url 'kadr_albums' user %}" class="btn btn-sm btn-light text-primary"><i class="bi bi-arrow-left"></i>&nbsp;Альбомы</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="canvas" class="user-select-none" style="height:calc(100vh - 200px);font-size:0;"></div>
+
+  <div class="w-100 position-relative overflow-hidden roster_wrap" style="height:100px;">
+    <div class="roster user-select-none d-flex position-absolute" style="height:100px;">
+      {% comment %}
+        port :: {
+          'imgname' :: str
+          'src' :: str
+          'mininame' :: str
+          'minisrc' :: str
+          'name' :: str
+          'guides' :: str
+        }
+      {% endcomment %}
+      {% for uuid, port in ports.items %}
+        <div class="port d-inline-block position-relative border border-2 overflow-hidden h-100 {% if port.guides %}border-info{% else %}border-danger-subtle{% endif %}"
+          style="aspect-ratio:102/152;"
+          data-uuid="{{ uuid }}"
+          data-imgname="{{ port.imgname }}"
+          data-guides="{{ port.guides }}">
+          <img
+            class="position-absolute"
+            src="{{ port.minisrc }}"
+            data-src="{{ port.src }}"
+            style="width:100%;left:0%;top:0%;"
+            ondragstart="return false;">
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+
+{% endblock content %}
+
+{% block js %}
+  <script src="/static/js/pixi732.js"></script>
+
+  <script>
+    const lim = (a,b,x) => Math.min(Math.max(a,x),b)
+    // point multiplication/scaling
+    // pmul(2, {x:2, y:3}) == {x:4, y:6}
+    // (Float, Point) -> Point
+    const pmul = (m, p) => ({x:p.x * m, y:p.y * m})
+    const pdiv = (p, d) => ({x:p.x / d, y:p.y / d})
+
+    // (Point, Point) -> Point
+    const padd = (a, b) => ({x:a.x + b.x, y:a.y + b.y})
+
+    // (Point, Point) -> Point
+    const pdif = (a, b) => ({x:a.x - b.x, y:a.y - b.y})
+
+    // (Point, Point) -> Number
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+
+    const postData = (url, jsonData) => {
+      const data = new FormData()
+      data.set('csrfmiddlewaretoken', '{{ csrf_token }}')
+      for (let k in jsonData) {data.set(k, jsonData[k])}
+      return fetch(url, {
+        method: 'POST',
+        body: data,
+        headers: {
+          //'Content-Type': 'application',
+          'X-CSRFToken': '{{ csrf_token }}',
+        }
+      })
+    }
+  </script>
+
+  <script>
+    function keyboard(value) {
+      const key = {};
+      key.value = value;
+      key.isDown = false;
+      key.isUp = true;
+      key.press = undefined;
+      key.release = undefined;
+      //The `downHandler`
+      key.downHandler = (event) => {
+        if (event.code === key.value) {
+          if (key.isUp && key.press) {
+            key.press();
+          }
+          key.isDown = true;
+          key.isUp = false;
+          event.preventDefault();
+        }
+      };
+
+      //The `upHandler`
+      key.upHandler = (event) => {
+        if (event.code === key.value) {
+          if (key.isDown && key.release) {
+            key.release();
+          }
+          key.isDown = false;
+          key.isUp = true;
+          event.preventDefault();
+        }
+      };
+
+      //Attach event listeners
+      const downListener = key.downHandler.bind(key);
+      const upListener = key.upHandler.bind(key);
+
+      window.addEventListener("keydown", downListener, false);
+      window.addEventListener("keyup", upListener, false);
+
+      // Detach event listeners
+      key.unsubscribe = () => {
+        window.removeEventListener("keydown", downListener);
+        window.removeEventListener("keyup", upListener);
+      };
+
+      return key;
+    }
+  </script>
+
+  <script>
+    const canvas_div = document.querySelector('#canvas')
+    // const init_width = window.innerWidth
+
+    const {Application, Container, Texture, Sprite, Graphics, Rectangle, Point} = PIXI
+    const loader = PIXI.Assets.loader
+    const app = new Application({
+      backgroundColor:0x999999,
+      // width:init_width,
+      // height:500,
+      autoStart:true,
+      antialias:false,
+      resizeTo: canvas_div,
+    })
+    // document.body.appendChild(app.view)
+    canvas_div.appendChild(app.view)
+    const stage = app.stage
+
+    const vars = {px_in_mm: 300 / 25.4, mmf: null, mmef: null, tmp_scale:0.5, tmp_pos:{x:0,y:0}, cur_src:null, imgs:{}, roster_drag:false}
+
+    const imgs = (function(){
+      let id = 0
+
+      const imgs = function(list) {
+        imgs._list = list
+        imgs._cur = null
+        imgs._index = -1
+        imgs._imgs = {}
+        imgs._tex = {}
+        imgs._spr = {}
+      }
+      imgs._get_tex = function(src) {
+        if (src in this._tex) {
+          return Promise.resolve(this._tex[src])
+        }
+        console.log('load src', src)
+        return loader.load(src).then(tex=>{
+          this._tex[src] = tex
+          return tex
+        })
+      }
+      imgs._get_spr = function(src, inst=1) {
+        const sprites_key = src + inst
+        if (sprites_key in this._spr) {
+          return Promise.resolve(this._spr[sprites_key])
+        }
+        return this._get_tex(src).then(tex => {
+          const spr = new Sprite(tex)
+          this._spr[sprites_key] = spr
+          spr.anchor.set(0.5)
+          return spr
+        })
+      }
+      imgs.new = function(src) {
+        const img = {}
+
+        this._imgs[src] = img
+
+        img.src = src
+        img.id = id++
+        img.spr = this._get_spr(src).then(spr=>{
+          img.spr = spr
+          return spr
+        })
+        img.ghost = this._get_spr(src, 2).then(ghost=>{
+          img.ghost = ghost
+          return ghost
+        })
+        img.kadr_done = false
+
+        if (src in vars.imgs) {
+          img.dom_data = vars.imgs[src]
+          img.uuid = vars.imgs[src].uuid
+          img.imgname = vars.imgs[src].imgsname
+          if (img.dom_data.kadr_done) {
+            img.kadr_done = true
+            img.kadr_loaded = false
+            img.kadr_data = img.dom_data.kadr_data
+          }
+        }
+
+        /*if (src in vars.imgs && vars.imgs[src].kadr_done) {
+          img.kadr_done = true
+          img.kadr_data = vars.imgs[src].kadr_data
+          img.name = vars.imgs[src].imgname
+          img.dom_data = vars.imgs[src]
+          img.kadr_loaded = false
+        }*/
+
+        img.setParent = function() {
+          if (this.spr instanceof Promise) {
+            this.spr.then(spr => {
+              spr.setParent(page.page)
+            })
+          } else {
+            this.spr.setParent(page.page)
+          }
+          if (this.ghost instanceof Promise) {
+            this.ghost.then(ghost => {
+              ghost.setParent(page.ghost)
+            })
+          } else {
+            this.ghost.setParent(page.ghost)
+          }
+          return this
+        }
+
+        img.unsetParent = function() {
+          if (this.spr instanceof Promise) {
+            this.spr.then(spr => {
+              spr.removeFromParent()
+            })
+          } else {
+            this.spr.removeFromParent()
+          }
+          if (this.ghost instanceof Promise) {
+            this.ghost.then(ghost => {
+              ghost.removeFromParent()
+            })
+          } else {
+            this.ghost.removeFromParent()
+          }
+          return this
+        }
+
+        return img
+      }
+      imgs.bySrc = function(src) {
+        if (src in this._imgs) {
+          return this._imgs[src]
+        }
+        return this.new(src)
+      }
+      imgs.cur = function() {
+        if (this._index > -1) {
+          return this.bySrc(this._list[this._index])
+        }
+        return this.first()
+      }
+      imgs.last = function() {
+        this._index = this._list.length - 1
+        return this.bySrc(this._list[this._index])
+      }
+      imgs.first = function() {
+        this._index = 0
+        return this.bySrc(this._list[this._index])
+      }
+      imgs.next = function() {
+        if (this._index >= this._list.length) {
+          return this.last()
+        }
+        this._index++
+        return this.bySrc(this._list[this._index])
+      }
+      imgs.prev = function() {
+        if (this._index <= 0) {
+          return this.first()
+        }
+        this._index--
+        return this.bySrc(this._list[this._index])
+      }
+
+      imgs.preloadNextSrc = function(cur_src) {
+        const cur_index = src_list.indexOf(cur_src)
+        if (cur_index >= src_list.length - 1) {
+          return
+        }
+        const next_src = src_list[cur_index + 1]
+        return this._get_tex(next_src)
+      }
+
+      return imgs
+    })()
+
+    class Img {
+      constructor() {
+
+      }
+
+
+    }
+
+    class Lay {
+      constructor(name, img) {
+        this.name = name
+        this.img = img
+      }
+
+      _ready(imgK, f) {
+        if (this.img[imgK] instanceof Promise) {
+          this.img[imgK].then(res => {
+            this.img[imgK] = res
+            f(res)
+          })
+        } else {
+          f(this.img[imgK])
+        }
+      }
+
+      ready(spr_f, ghost_f=spr_f) {
+        this._ready('spr', spr_f)
+        this._ready('ghost', ghost_f)
+      }
+
+      show() {
+        this.ready(spr=>{
+          spr.setParent(page.page)
+        }, ghost=>{
+          ghost.setParent(page.ghost)
+        })
+      }
+
+      hide() {
+        this.ready(spr=>{
+          spr.removeFromParent()
+        })
+      }
+
+      move(x=0, y=x) {
+        this.ready(spr=>{
+          spr.x=x
+          spr.y=y
+        })
+        return this
+      }
+
+      scale(value) {
+        this.ready(spr=>{
+          spr.scale.set(value)
+        })
+        return this
+      }
+
+      sc(value) {
+        // if (!this.loaded) {return}
+        if (value===undefined) {
+          return this.img.spr.scale.x
+        }
+        this.img.spr.scale.set(value)
+        this.img.ghost.scale.set(value)
+        return this
+      }
+
+      point(point) {
+        if (point===undefined) {
+          return this.img.spr.position
+        }
+
+        if (typeof(point)==='function') {
+          vars.mmf = mm => {
+            this.img.spr.position.copyFrom(point(mm))
+            this.img.ghost.position.copyFrom(img.spr.position)
+          }
+          return this
+        }
+
+        this.img.spr.position.copyFrom(point)
+        this.img.ghost.position.copyFrom(point)
+
+        return this
+      }
+
+      pos(x=0, y=x) {
+        this.img.spr.position.set(x,y)
+        this.img.ghost.position.copyFrom(this.img.spr.position)
+        return this
+      }
+
+
+    }
+
+    const layer = (function(){
+      const lays_by_src = {}
+      const lays_by_img = {}
+      const lays = []
+
+      const layer = function(name_or_img, img) {
+        let name = null
+
+        if (typeof(name_or_img)==='string') {
+          name = name_or_img
+        } else if (typeof(name_or_img)==='object') {
+          img = name_or_img
+        }
+
+        if (name && img) {
+          if (name in layer._by_name && img === layer._get_by_name(name)) {
+            return layer._get_by_name(name)
+          }
+          if (img.src in layer._by_img) {
+            layer._by_name[name] = layer._get_by_img(img)
+            return layer._get_by_name(name)
+          }
+          return layer.new(name, img)
+        }
+
+        if (name===null && img) {
+          if (!(img.id in layer._by_img)) {
+            layer.active = layer.new(img.id, img)
+            return layer.active
+          }
+          return layer._get_by_img(img)
+        }
+
+        if (name && img===undefined) {
+          if (name in layer._by_name) {
+            return layer._get_by_name(name)
+          }
+        }
+
+        if (name===null && img===undefined) {
+          return layer.active
+          // return layer._get_by_name('default')
+        }
+
+        return
+      }
+      layer._by_name = {}
+      layer._by_img = {}
+      layer._lays = lays
+
+      layer.new = function(name, img) {
+        const lay = {}
+        lay.name = name
+        lay.img = img
+        lay.loaded = false
+
+        this._by_name[name] = lay
+        this._by_img[img.id] = lay
+        lays.push(lay)
+
+        lay._img_ready = function(k, f) {
+          if (img[k] instanceof Promise) {
+            img[k].then(res => {
+              // img[k] = res
+              f(res)
+              this.loaded = true
+              return res
+            })
+          } else {
+            f(img[k])
+          }
+        }
+
+        lay._ready = function(spr_f, ghost_f=spr_f) {
+          this._img_ready('spr', spr_f)
+          this._img_ready('ghost', ghost_f)
+          return this
+        }
+
+        // not working properly
+        lay.map = function(f) {
+          // this.img.spr
+          // this.img.ghost
+          if (this.img.spr instanceof Promise) {
+            this.img.spr.then(spr => {
+              f(spr)
+              this.loaded = true
+            })
+          } else {
+            f(this.img.spr)
+          }
+          if (this.img.ghost instanceof Promise) {
+            this.img.ghost.then(ghost => {
+              f(ghost)
+              this.loaded = true
+            })
+          } else {
+            f(this.img.ghost)
+          }
+        }
+
+        lay.point = function(point) {
+          if (img.spr instanceof Promise) {return}
+
+          if (point === undefined) {
+            return img.spr.position
+          }
+
+          if (typeof(point)==='function') {
+            vars.mmf = mm => {
+              img.spr.position.copyFrom(point(mm))
+              img.ghost.position.copyFrom(img.spr.position)
+            }
+            return lay
+          }
+
+          img.spr.position.copyFrom(point)
+          img.ghost.position.copyFrom(point)
+
+          return lay
+        }
+
+        lay.point_copy = function() {
+          return {x:this.img.spr.x, y:this.img.spr.y}
+        }
+
+        lay.point_eq = function(pt) {
+          return pt.x === this.img.spr.x && pt.y === this.img.spr.y
+        }
+
+        lay.pos = function(x=0, y=x) {
+          if (!this.loaded) {return}
+          img.spr.position.set(x,y)
+          img.ghost.position.copyFrom(img.spr.position)
+          return this
+        }
+
+        lay.show = function() {
+          layer.active = this
+          const src = this.img.src
+          vars.cur_src = src
+
+          let tmp_pos = vars.tmp_pos
+          let tmp_scale = vars.tmp_scale
+          let kadr_data = null
+          let raw_kadr_data = null
+
+          if (src in vars.imgs) {
+            const div = vars.imgs[src].div
+            div.classList.remove('border-info', 'border-danger-subtle')
+            div.classList.add('border-primary')
+            if (vars.imgs[src].kadr_done) {
+              kadr_data = vars.imgs[src].kadr_data
+              raw_kadr_data = vars.imgs[src].raw_kadr_data
+            }
+          }
+
+          layer.loadNextImg(src)
+
+          return this._ready(spr => {
+            spr.setParent(page.page)
+            if(!this.img.kadr_loaded) {
+              if (kadr_data) {
+                const pixi_kadr_data = kadr_pixi(
+                  page.mask, 0.13, 0.5,
+                  spr, kadr_data[0], kadr_data[1], kadr_data[2]
+                )
+                tmp_pos = pixi_kadr_data.pos
+                tmp_scale = pixi_kadr_data.scale
+              }
+              spr.position.copyFrom(tmp_pos)
+              spr.scale.set(tmp_scale)
+            }
+          }, ghost => {
+            ghost.setParent(page.ghost)
+            if(!this.img.kadr_loaded) {
+              if (kadr_data) {
+                const pixi_kadr_data = kadr_pixi(
+                  page.mask, 0.13, 0.5,
+                  ghost, kadr_data[0], kadr_data[1], kadr_data[2]
+                )
+                tmp_pos = pixi_kadr_data.pos
+                tmp_scale = pixi_kadr_data.scale
+                this.img.kadr_loaded = true
+                this.img.last_saved_db = raw_kadr_data
+              }
+              ghost.position.copyFrom(tmp_pos)
+              ghost.scale.set(tmp_scale)
+            }
+          })
+        }
+
+        lay.saveTmp = function() {
+          vars.tmp_scale = this.sc()
+          vars.tmp_pos = this.point_copy()
+          this.img.kadr_done = true
+          this.img.kadr_loaded = true
+
+          return this
+        }
+
+        lay.updateIcon = function() {
+          console.log('lay.updateIcon')
+          const img = document.querySelector(`img[data-src='${this.img.src}']`)
+          if (!img) {return}
+          const div = img.parentElement
+          const spr = this.img.spr
+          img.style.width = getStyleWidth(spr)
+          img.style.top = getStyleTop(spr)
+          img.style.left = getStyleLeft(spr)
+          const name = this.img.src.split('/').slice(-1)[0]
+          const raw_kadr_data = [
+            //name,
+            getKadrTop(
+              guide.item(0).value,
+              page.mask.height,
+              this.img.spr.height,  // scaled height
+              this.img.spr.y,
+            ),
+            getKadrTop(
+              guide.item(1).value,
+              page.mask.height,
+              this.img.spr.height,  // scaled height
+              this.img.spr.y,
+            ),
+            getKadrLeft(
+              0.5,
+              page.mask.width,
+              this.img.spr.width,  // scaled width
+              this.img.spr.x,
+            )
+          ].join(';')
+          div.dataset.guides = raw_kadr_data
+          div.classList.add('border-info')
+          div.classList.remove('border-primary', 'border-danger-subtle')
+
+          if (this.img.last_saved_db && this.img.last_saved_db === raw_kadr_data) {
+            return raw_kadr_data
+          }
+
+          if (this.img.dirty) {
+            this.saveToDb(raw_kadr_data).then(text => {
+              if (text !== 'OK') {
+                console.warn(text)
+                div.classList.remove('border-info', 'border-primary', 'border-danger-subtle')
+                div.classList.add('border-danger')
+              }
+            })
+          }
+
+          return raw_kadr_data
+        }
+
+        lay.saveToDb = function(raw_kadr_data) {
+          console.log('store to db', raw_kadr_data)
+          this.img.dirty = false
+          return postData('{{ request.path }}', {
+            action: 'save_kadr_data',
+            data: raw_kadr_data,
+            uuid: this.img.dom_data.uuid,
+            img: this.img.dom_data.imgname,
+          }).then(res => res.text()).then(text => {
+            if (text === 'OK') {
+              this.img.last_saved_db = raw_kadr_data
+              // this.img.dirty = false
+            } else {
+              this.img.dirty = true
+            }
+            return text
+          })
+        }
+
+        lay.hide = function() {
+          if (layer.active == this) {
+            layer.active = null
+            this.saveTmp()
+            this.updateIcon()
+          }
+          return this._ready(spr => {
+            spr.removeFromParent()
+          })
+        }
+
+        lay.move = function(x=0, y=x) {
+          return lay._ready(spr => {
+            spr.x = x
+            spr.y = y
+          })
+        }
+
+        lay.scale = function(value) {
+          return lay._ready(spr => {
+            spr.scale.set(value)
+          })
+        }
+
+        lay.sc = function(value) {
+          if (!this.loaded) {return}
+          if (value===undefined) {
+            return img.spr.scale.x
+          }
+          img.spr.scale.set(value)
+          img.ghost.scale.set(value)
+          return this
+        }
+
+        return lay
+      }
+
+      layer._get_by_name = function(name) {
+        return this._by_name[name]
+      }
+
+      layer._get_by_img = function(img) {
+        return this._by_img[img.id]
+      }
+
+      layer.setActiveSrc = function(src) {
+        vars.cur_src = src
+        if (layer.active) {
+          layer.active.hide()
+        }
+        let lay = lays.find(l => l.src === src)
+        if (!lay) {
+          let img = imgs.bySrc(src)
+          lay = layer(img)
+        }
+        if (lay) {
+          layer.active = lay
+          lay.show()
+        }
+      }
+
+      layer.loadNextImg = function(cur_src) {
+        imgs.preloadNextSrc(cur_src)
+      }
+
+      layer.setActiveNext = function() {
+        const cur_index = src_list.indexOf(vars.cur_src)
+        if (cur_index === -1) {return}
+        if (cur_index >= src_list.length - 1) {return}
+
+        const next_src = src_list[cur_index + 1]
+
+        this.setActiveSrc(next_src)
+      }
+
+      layer.setActivePrev = function() {
+        const cur_index = src_list.indexOf(vars.cur_src)
+        if (cur_index === -1) {return}
+        if (cur_index <= 0) {return}
+
+        const next_src = src_list[cur_index - 1]
+
+        this.setActiveSrc(next_src)
+      }
+
+      return layer
+    })()
+
+    const page = (function(){
+      const page = function(w,h){
+        /*  - stage
+              - pos (page and complementary items position)
+                - scaled (all staff that should be scaled together)
+                  - ghost
+                    + (ghost layers)
+                  - page
+                    - mask
+                    - white
+                    + (layers)
+                - guides
+                  + (guides)
+                - page_ctrl
+              - stage_ctrl
+        */
+        if (page.pos) {return page}
+
+        if (typeof(w)==='string') {
+          if (w.slice(-2)==='mm') {
+            w = parseFloat(w) * vars.px_in_mm
+          }
+        }
+        if (typeof(h)==='string') {
+          if (h.slice(-2)==='mm') {
+            h = parseFloat(h) * vars.px_in_mm
+          }
+        }
+        page.w = w
+        page.h = h
+
+        const pos = new Container()
+        page.pos = pos
+        pos.setParent(stage)
+
+        const scaled = new Container()
+        page.scaled = scaled
+        scaled.setParent(pos)
+
+        const ghost = new Container()
+        page.ghost = ghost
+        ghost.setParent(scaled)
+        ghost.alpha = 0.1
+
+        const _page = new Container()
+        page.page = _page
+        _page.setParent(scaled)
+
+        const mask = new Graphics()
+        page.mask = mask
+        mask.setParent(_page)
+        mask.beginFill(0xff0000).drawRect(-w/2,-h/2,w,h).endFill()
+        _page.mask = mask
+
+        const white = new Graphics()
+        page.white = white
+        white.setParent(_page)
+        white.beginFill(0xffffff).drawRect(-w/2-10,-h/2-10,w+20,h+20).endFill()
+
+        const guides = new Container()
+        page.guides = guides
+        guides.setParent(pos)
+
+        const page_ctrl = new Container()
+        page.page_ctrl = page_ctrl
+        page_ctrl.setParent(pos)
+
+        const stage_ctrl = new Container()
+        page.stage_ctrl = stage_ctrl
+        stage_ctrl.setParent(stage)
+
+        const page_ratio = w / h
+        const app_ratio = app.screen.width / app.screen.height
+        const init_zoom = app_ratio > page_ratio
+          ? (app.screen.height - 100) / h
+          : (app.screen.width - 100) / w
+
+        return page.zoom(init_zoom).center()
+      }
+
+      page.height = function() {
+        return this.mask.height * this.zoom()
+      }
+
+      page.width = function() {
+        return this.mask.width * this.zoom()
+      }
+
+      page.zoom = function(value) {
+        if (value === undefined) {
+          return this.scaled.scale.x
+        }
+        if (value==='auto') {
+          const page_ratio = page.w / page.h
+          const app_ratio = app.screen.width / app.screen.height
+          value = app_ratio > page_ratio
+            ? (app.screen.height - 100) / page.h
+            : (app.screen.width - 100) / page.w
+        }
+        this.scaled.scale.set(value)
+        guide.update()
+        ctrl.update()
+        return this
+      }
+
+      page.center = function() {
+        this.move(app.screen.width/2, app.screen.height/2)
+        return this
+      }
+
+      page.move = function(x=0,y=x) {
+        this.pos.position.set(x,y)
+        ctrl.update()
+        return this
+      }
+
+      return page
+    })()
+
+    const guide = (function(){
+      const guide = function(value) {
+        let g = guide._guides.find(i => i.value === value)
+        if (g===undefined) {
+          const gr = new Graphics()
+          gr.setParent(page.guides)
+
+          gr.lineStyle(2, 0x00ffff, .4).lineTo(window.screen.width*2, 0)
+          gr.x = -window.screen.width
+          // gr.y = page.height() * (value - 0.5)
+
+          g = {value, gr}
+          g.set = function(value) {
+            this.value = value
+            guide.update()
+          }
+          guide._guides.push(g)
+          guide._guides.sort((a,b) => a.value - b.value)
+          guide.update()
+        }
+        return g
+      }
+      guide._guides = []
+      guide.len = function() {
+        return this._guides.length
+      }
+      guide.update = function() {
+        const page_height = page.height()
+        this._guides.forEach(g => {
+          g.gr.y = page_height * (g.value - 0.5)
+        })
+        ctrl.update()
+        return this
+      }
+      guide.item = function(index=0) {
+        return this._guides[index]
+      }
+      guide.min = function(index=0) {
+        // this._guides.sort((a,b) => a.value-b.value)
+        return this._guides[index]
+      }
+
+      return guide
+    })()
+
+    const ctrl = (function(){
+      const ctrl = function(layer) {
+        stage.interactive = true
+        stage.cursor = 'move'
+
+        stage.hitArea = new Rectangle(
+          -window.screen.width,
+          -window.screen.height,
+          2*window.screen.width,
+          2*window.screen.height,
+        )
+
+        stage.on('pointermove', mm => {
+          vars.mm = mm
+          if (vars.mmf) {
+            vars.mmf(mm)
+          }
+        })
+
+        stage.on('pointerup', mm => {
+          console.log('up')
+          vars.mmf = null
+          if (vars.mmef) {
+            vars.mmef(mm)
+            vars.mmef = null
+          }
+        })
+
+        stage.on('pointerupoutside', mm => {
+          console.log('up-out')
+          vars.mmf = null
+          if (vars.mmef) {
+            vars.mmef(mm)
+            vars.mmef = null
+          }
+        })
+
+        ctrl._init_scale_center()
+
+        ctrl._init_done = true
+        ctrl.update()
+      }
+
+      ctrl._init_scale_center = function() {
+        if (this._init_scale_center_done) {return}
+
+        // page.page_ctrl
+        const g = new Graphics()
+        this.scale_center = g
+        g.setParent(page.page_ctrl)
+        g.lineStyle(2, 0x00ffff, .5).drawRect(-10,-10,20,20)
+        // g.beginFill(0x00ffff).drawRect(-10,-10,20,20).endFill()
+        g.interactive = true
+        g.hitArea = new Rectangle(-10,-10,20,20)
+        g.cursor = 'ew-resize'
+
+        g.on('pointerdown', e => {
+          stage.cursor = 'ew-resize'
+          e.stopPropagation()
+
+          const lay = layer()
+          const img = lay.img
+          const s = lay.sc()
+          const c = page.pos.toGlobal(stage.position)
+          const d = dist(e.global, c)
+          const sk = s / d
+          const pt = lay.point_copy()
+
+          const sp = pmul(1/d, pt)
+
+          vars.mmf = mm => {
+            const d1 = dist(mm.global, c)
+            lay.sc(d1 * sk)
+            lay.point(pmul(d1, sp))
+          }
+
+          vars.mmef = () => {
+            if (lay.sc() !== s || !lay.point_eq(pt)) {
+              img.dirty = true
+            }
+            stage.cursor = 'move'
+          }
+        })
+
+        this._init_scale_center_done = true
+        return true
+      }
+
+      ctrl._init_scale_head = function() {
+        if (this._init_scale_head_done) {return}
+        if (guide.len() < 2) {return}
+
+        const g = new Graphics()
+        this.scale_head = g
+        g.setParent(page.page_ctrl)
+        g.beginFill(0x00ffff, .4).drawRect(-10,-10,20,20).endFill()
+        g.interactive = true
+        g.cursor = 'ew-resize'
+
+        g.on('pointerdown', e => {
+          stage.cursor = 'ew-resize'
+          e.stopPropagation()
+
+          const lay = layer()
+          const img = lay.img
+          const s = lay.sc()
+          const g_g = g.toGlobal(stage.position)
+          const c_g = {x: page.pos.x, y: g_g.y}
+          const c_l = page.mask.toLocal(c_g)
+          const d = dist(e.global, c_g)
+          const sk = s / d
+
+          const p_l = lay.point_copy()
+          const sp = pmul(1/d, pdif(p_l, c_l))
+
+          vars.mmf = mm => {
+            const d1 = dist(mm.global, c_g)
+            lay.sc(d1 * sk)
+            lay.point(padd(c_l, pmul(d1, sp)))
+          }
+
+          vars.mmef = () => {
+            if (lay.sc() !== s || !lay.point_eq(p_l)) {
+              img.dirty = true
+            }
+            stage.cursor = 'move'
+          }
+        })
+
+        this._init_scale_head_done = true
+
+        return true
+      }
+
+      ctrl._update_scale_head = function() {
+        if (!this._init_scale_head_done) {
+          if (!this._init_scale_head()) {return}
+        }
+        this.scale_head.x = Math.min(
+          page.width()/2 + 50,
+          app.screen.width - page.pos.x - 50,
+        )
+        const g1 = guide.min(0).value
+        const g2 = guide.min(1).value
+        const top = (g1 + g2) / 2
+        const between_two_guides_y = page.height() * (top - 0.5)
+        this.scale_head.y = between_two_guides_y
+      }
+
+      ctrl._update_scale_center = function() {
+        this.scale_center.x = Math.min(
+          page.width()/2 + 50,
+          app.screen.width - page.pos.x - 50,
+        )
+      }
+
+      ctrl._update_scale_img = function() {
+
+      }
+
+      ctrl._init_scale_img = function() {
+
+      }
+
+      ctrl.update = function() {
+        if (!this._init_done) {return}
+        this._update_scale_center()
+        this._update_scale_head()
+      }
+
+      return ctrl
+    })()
+
+    const click = (el, f) => {
+      el.addEventListener('click', f)
+    }
+
+    const resize = (f) => {
+      window.addEventListener('resize', f)
+    }
+
+    const key = function(code, f) {
+      if (!(code in kay.keys)) {
+        key.keys[code] = keyboard(code)
+      }
+      const k = key.keys[code]
+      if (f)
+        k.press = f
+      return k
+    }
+    key.keys = {}
+
+
+
+
+
+
+
+
+
+
+
+    const ports_divs = document.querySelectorAll('.roster .port')
+    const src_list = []
+
+    ports_divs.forEach(div => {
+      const img = div.querySelector('img[data-src]')
+      const src = img.dataset.src
+      src_list.push(src)
+      click(div, e => {
+        console.log('click roster_drag', vars.roster_drag)
+        if (!vars.roster_drag) {
+          layer.setActiveSrc(src)
+        } else {
+          vars.roster_drag = false
+        }
+      })
+
+      const raw_kadr_data = div.dataset.guides
+
+      if (raw_kadr_data) {
+        const updateStyle = () => {
+           const style = kadr_raw_to_style(
+             div, 0.13, 0.5,
+             img, raw_kadr_data
+           )
+
+           img.style.width = style.width
+           img.style.left = style.left
+           img.style.top = style.top
+        }
+
+        if ('complete' in img && img.complete) {updateStyle()}
+        else {img.addEventListener('load', updateStyle)}
+      }
+
+      vars.imgs[src] = {
+        div: div,
+        img: img,
+        raw_kadr_data: raw_kadr_data,
+        uuid: div.dataset.uuid,
+        imgname: div.dataset.imgname,
+      }
+
+      if (raw_kadr_data) {
+        const kadr_data = raw_kadr_data.split(';')
+        //vars.imgs[src].uuid = div.dataset.uuid
+        //vars.imgs[src].imgname = div.dataset.imgname
+        vars.imgs[src].kadr_data = [
+          parseFloat(kadr_data[0]),
+          parseFloat(kadr_data[1]),
+          parseFloat(kadr_data[2]),
+        ]
+        vars.imgs[src].kadr_done = true
+      }
+    })
+
+    page('102mm', '152mm')
+    ctrl()
+    guide(0.13)
+    guide(0.5)
+    imgs(src_list)
+    layer(imgs.first()).show()
+
+    stage.on('pointerdown', e => {
+      console.log('stage.down')
+      /*
+        pos' = pos + (m' - m) / z
+        pos' = m'/z + pos - m/z
+        delta = pos - m/z
+        pos' = delta + m'/z
+
+        const k = 1 / page.zoom()
+        const delta = pdif(layer().pos(), pmul(k, e.global))
+
+        layer().pos(e => {
+          return padd(delta, pmul(k, e.global))
+        })
+      */
+
+      const lay = layer()
+      const img = lay.img
+      const pos = lay.point()
+      const init_pos = {x:pos.x, y:pos.y}
+      const local_space = lay.img.spr.parent
+      const init_m_local = local_space.toLocal(e.global)
+
+      lay.point(mm => {
+        //img.dirty = true
+        return padd(init_pos, pdif(local_space.toLocal(mm.global), init_m_local))
+      })
+      vars.mmef = () => {
+        if (!lay.point_eq(init_pos)) {
+          img.dirty = true
+        }
+      }
+    })
+
+    const onWindowResize = () => {
+      page.center()
+      page.zoom('auto')
+      vars.updateRosterScroll(layer.active.img.src)
+    }
+    resize(() => {
+      clearTimeout(vars.doit)
+      vars.doit = setTimeout(onWindowResize, 100)
+    })
+    keyboard('Period').press = () => {
+      layer.setActiveNext()
+      vars.updateRosterScroll(layer.active.img.src)
+    }
+    keyboard('Comma').press = () => {
+      layer.setActivePrev()
+      vars.updateRosterScroll(layer.active.img.src)
+    }
+    keyboard('ArrowRight').press = () => {
+      layer.setActiveNext()
+      vars.updateRosterScroll(layer.active.img.src)
+    }
+    keyboard('ArrowLeft').press = () => {
+      layer.setActivePrev()
+      vars.updateRosterScroll(layer.active.img.src)
+    }
+
+    window.addEventListener('beforeunload', () => {
+      layer._lays.forEach(lay => {
+        if (lay.img.dirty) {
+          lay.updateIcon()
+        }
+      })
+    })
+
+    /* CONCEPT
+
+      key('.', () => {
+        imgs.cur().save('kadr')
+        layer('trg').hide()
+        layer('trg', imgs.next()).show()
+      })
+
+      ctrl('stage').down = e => {
+        const lay = layer()
+        const k = 1 / page.zoom()
+        const delta = pdif(lay.pos(), pmul(k, e.global))
+        ctrl('stage').move = e => {
+          lay.pos(padd(delta, pmul(k, e.global)))
+        }
+        ctrl('stage').up = e => {
+        }
+      }
+
+      key(',', () => {
+        imgs.cur().save('kadr')
+        layer(imgs.cur()).hide()
+        layer(imgs.prev()).show()
+      })
+      key('meta', () => {
+        vars('scale', true)
+        ctrl().mode('scale')
+      }, () => {
+        vars('scale', false)
+        ctrl().mode()
+      })
+      ctrl().mouse(()=>{
+        vars('mouse', true)
+        if (vars('scale')) {return}
+        ctrl().mode('drag')
+      }, () => {
+        vars('mouse', false)
+        if (vars('scale')) {return}
+        ctrl().mode()
+      })
+
+      // DOCUMENT FORMAT
+      const doc = [
+        {n:'cont', p: }
+      ]
+
+      const doc = [
+        {n: 'cont', pos: [workspace_w/2, workspace_h/2], scale: zoom, has: [
+          {n: 'ghost', alpha: 0.1},
+          {n: 'page', has: [
+            {n: 'mask', t: 'G', rect: [0xff, -width_px/2,-height_px/2,width_px,height_px], mask: true},
+            {n: 'white', t: 'G', rect: [0xffffff, -width_px/2-10,-height_px/2-10,width_px+20,height_px+20]},
+          ]},
+        ]},
+        {n: 'center', t:'G', circ: [0x00ffff, workspace_w/2,workspace_h/2,4]},
+        {n: 'guide1', t:'G', pos: [0, cont.y + cont.height * (guideline1 - 0.5)], line: [1, 0x00ffff, .5, workspace_w, 0]}
+      ]
+
+
+      //// OLD STAFF ////
+      // Sprites Storage
+      const textures = {}
+      const sprites = {}
+      const kadr = {}
+      let cur_src = false
+      let cur_spr = false
+      let cur_spr2 = false
+      let last_x = 0
+      let last_y = 0
+      let last_scale = 0.5
+
+      const getTex = src => {
+        if (src in textures) {
+          // return textures[src]
+          return Promise.resolve(textures[src])
+        }
+        // textures[src] = Texture.from(src)
+        // return textures[src]
+        return loader.load(src).then(tex=>{
+          textures[src] = tex
+          return tex
+        })
+      }
+
+      const getSpr = (src, inst=1) => {
+        const sprites_key = src + inst
+        if (sprites_key in sprites) {
+          // return sprites[sprites_key]
+          return Promise.resolve(sprites[sprites_key])
+        }
+        // const tex = getTex(src)
+        // const spr = sprites[sprites_key] = new Sprite(tex)
+        // return spr
+        return getTex(src).then(tex => {
+          const spr = new Sprite(tex)
+          sprites[sprites_key] = spr
+          spr.anchor.set(0.5)
+          return spr
+        })
+      }
+
+      const setKadrPos = (src, pos) => {
+        if (!(src in kadr)) {kadr[src] = {}}
+        if (!('pos' in kadr[src])) {kadr[src].pos = {}}
+        kadr[src].pos.x = pos.x
+        kadr[src].pos.y = pos.y
+        last_x = pos.x
+        last_y = pos.y
+      }
+
+      const getKadrPos = (src) => {
+        if (!(src in kadr)) {return {x:last_x,y:last_y}}
+        if (!('pos' in kadr[src])) {return {x:last_x,y:last_y}}
+        return kadr[src].pos
+      }
+
+      const setKadrScale = (src, val) => {
+        if (!(src in kadr)) {kadr[src] = {}}
+        kadr[src].scale = val
+        last_scale = val
+      }
+
+      const getKadrScale = (src) => {
+        if (!(src in kadr)) {return last_scale}
+        if (!('scale' in kadr[src])) {return last_scale}
+        return kadr[src].scale
+      }
+
+      const setCurSpr = src => {
+        if (cur_src == src) {
+          return
+        }
+        if (cur_src) {
+          cur_src = false
+        }
+        if (cur_spr) {
+          cur_spr.removeFromParent()
+          cur_spr = false
+        }
+        if (cur_spr2) {
+          cur_spr2.removeFromParent()
+          cur_spr2 = false
+        }
+        // move.clear()
+        // scale.clear()
+
+        cur_src = src
+
+        getSpr(src).then(spr => {
+          cur_spr = spr
+          spr.scale.set(getKadrScale(src))
+          spr.position.copyFrom(getKadrPos(src))
+          spr.setParent(page)
+
+          // const w = spr.width*zoom
+          // const h = spr.height*zoom
+
+          // move.lineStyle(1,0x00ffff).drawRect(-w/2, -h/2, w, h)
+          // move.hitArea = new Rectangle(-w/2, -h/2, w, h)
+          // ctrl.position.set(spr.x*zoom, spr.y*zoom)
+
+          // scale.beginFill(0x00ffff).drawRect(-6, -6, 12, 12).endFill()
+          // scale.x = w/2
+          // scale.y = 0
+          // scale.hitArea = new Rectangle(-6,-6,12,12)
+
+          getSpr(src, 2).then(spr2 => {
+            cur_spr2 = spr2
+            spr2.scale.set(spr.scale.x)
+            spr2.position.copyFrom(spr)
+            spr2.setParent(ghost)
+          })
+        })
+      }
+
+      // Interaction
+      function port_click(e) {
+        const img = e.target.querySelector('img[data-src]')
+        if (!img) {return}
+        setCurSpr(img.dataset.src)
+      }
+      const ports = document.querySelectorAll('.roster .port')
+      ports.forEach(port => {port.addEventListener('click', port_click)})
+      if (!cur_src) {setCurSpr(ports[0].querySelector('img[data-src]').dataset.src)}
+
+      // Keyboard
+      let scaleMode = false
+      let mouseMode = null // null | move | scale
+      let mouseDown = false
+      const setMouseMode = value => {
+        if        (mouseMode ===  null  && value === 'move') {
+          startFreeDrag(mouse_move_event)
+        }
+        else if   (mouseMode ===  null  && value === 'scale') {
+          startFreeScale(mouse_move_event)
+        }
+        else if   (mouseMode === 'move' && value === null) {
+          move_func = null
+          if (onMoveEnd) {
+            onMoveEnd()
+            onMoveEnd = null
+          }
+        }
+        else if   (mouseMode === 'move' && value === 'scale') {
+          if (onMoveEnd) {
+            onMoveEnd()
+            onMoveEnd = null
+          }
+          startFreeScale(mouse_move_event)
+        }
+        else if   (mouseMode === 'scale' && value === null) {
+          move_func = null
+          if (onMoveEnd) {
+            onMoveEnd()
+            onMoveEnd = null
+          }
+        }
+        else if   (mouseMode === 'scale' && value === 'move') {
+          if (onMoveEnd) {
+            onMoveEnd()
+            onMoveEnd = null
+          }
+          startFreeDrag(mouse_move_event)
+        }
+
+        mouseMode = value
+      }
+
+      // Mouse
+      stage.interactive = true
+      stage.hitArea = new Rectangle(-window.screen.width, -window.screen.height, 2*window.screen.width, 2*window.screen.height)
+      stage.on('pointerup', stageMouseUp)
+      stage.on('pointerupoutside', stageMouseUp)
+      let move_func = null
+      let mouse_move_event = null
+
+      stage.on('mousemove', e => {
+        mouse_move_event = e
+        if (move_func) {move_func(e)}
+      })
+
+      function stageMouseUp(e) {
+        // stage.off('pointermove')
+        mouseDown = false
+        // move_func = null
+        // if (onMoveEnd) {
+        //   onMoveEnd(e)
+        //   onMoveEnd = null
+        // }
+        // setMouseMode(null)
+        if (scaleMode) {}
+        else {setMouseMode(null)}
+      }
+
+      function onMouseDown(event) {
+        if (scaleMode) {
+          const x0 = e.global.x
+          // const glob = total_scale_cont.toGlobal(new Point(0,0))
+          // const d0 = Math.hypot(e.global.x - glob.x, e.global.y - glob.y)
+          const s0 = cur_spr.scale.x
+          stage.on('pointermove', e2 => {
+            // const d1 = Math.hypot(e2.global.x - glob.x, e2.global.y - glob.y)
+            // const d = d1/d0
+            const d = e2.global.x - x0
+            total_scale.x = d
+            cur_spr.scale.set(s0 * (1 + d/workspace_w))
+            cur_spr2.scale.set(cur_spr.scale.x)
+          })
+          onMoveEnd = e => {
+            total_scale.x = 0
+            setKadrScale(cur_src, cur_spr.scale.x)
+          }
+        }
+      }
+
+      const startFreeScale = mouse_event => {
+        const d = dist(mouse_event.global, cont.position)
+        const s = cur_spr.scale.x
+        const k = s / d
+        const p = pdiv(cur_spr.position, d)
+
+          // scale  - dist   |
+          // scale' - dist'  | => scale' = scale * dist' / dist
+          // anchor pos  - dist   |
+          // anchor pos' - dist'  | => anchor pos' = anchor pos * dist' / dist
+
+        move_func = e => {
+          const d1 = dist(e.global, cont.position)
+          cur_spr.scale.set(k * d1)
+          cur_spr2.scale.set(cur_spr.scale.x)
+          cur_spr.position.copyFrom(pmul(d1, p))
+          cur_spr2.position.copyFrom(cur_spr.position)
+        }
+        onMoveEnd = e => {
+          setKadrScale(cur_src, cur_spr.scale.x)
+          setKadrPos(cur_src, cur_spr.position)
+        }
+      }
+
+      const startFreeDrag = e => {
+        const delta = pdif(cur_spr.position, pdiv(e.global, zoom))
+        move_func = e => {
+          cur_spr.position.copyFrom(padd(delta, pdiv(e.global, zoom)))
+          cur_spr2.position.copyFrom(cur_spr.position)
+        }
+        onMoveEnd = e => {
+          setKadrPos(cur_src, cur_spr.position)
+        }
+      }
+    */
+
+    function getStyleWidth(spr) {
+      return spr.width / page.mask.width * 100 + '%'
+    }
+
+    function getStyleLeft(spr) {
+      return (-spr.width/2 + page.mask.width/2 + spr.x)/page.mask.width * 100 + '%'
+    }
+
+    function getStyleTop(spr) {
+      return (-spr.height/2 + page.mask.height/2 + spr.y)/page.mask.height * 100 + '%'
+    }
+
+    function getKadrTop(trg_top, trg_h, img_h, img_y) {
+
+      // NOTE!!! img_h is already scaled since img_h is spr.height
+      // which is spr.texture.height * spr.scale.x
+
+      const img_top_px = trg_h * (trg_top - 0.5) - img_y + img_h * 0.5
+
+      return img_top_px / img_h
+    }
+
+    function getKadrLeft(trg_mid=0.5, trg_w, img_w, img_x) {
+
+      // NOTE !!! img_w is already scaled since:
+      // img_w = spr.width = spr.texture.width * spr.scale.x
+
+      const trg_mid_px = trg_w * (trg_mid - 0.5)  // usually 0
+      const img_mid_px_trg = img_x - img_w * 0.5
+      const img_mid_px = trg_mid_px - img_mid_px_trg
+
+      return img_mid_px / img_w
+    }
+
+    function kadr_data_to_style(
+      trg_w, trg_h, trg_t, trg_b, trg_c,
+      img_w, img_h, img_t, img_b, img_c)
+    {
+      /*
+        trg_w - trg frame width px [152]
+        trg_h - trg frame height px [203]
+        trg_t - trg frame top guide line [0.11]
+        trg_b - trg frame bottom guide line [0.66]
+        trg_c - trg frame middle vertical guide line [0.5]
+        img_w - pasted image width px [3500]
+        img_h - pasted image height px [2700]
+        img_t - pasted image top guide line [0.22]
+        img_b - pasted image bottom guide line [0.55]
+        img_c - pasted image middle vertical guide line [0.43]
+      */
+      const trg_r = trg_w / trg_h
+      const trg_s = trg_b - trg_t
+      const trg_k = trg_r / trg_s
+
+      const img_r = img_w / img_h
+      const img_s = img_b - img_t
+      const img_k = img_r / img_s
+
+      const k = img_k / trg_k
+
+      const w = k
+      const l = 0.5 - k * img_c
+      const t = trg_t - img_t * trg_s / img_s
+
+      return {
+        width: w * 100 + '%',
+        left: l * 100 + '%',
+        top: t * 100 + '%',
+      }
+    }
+
+    function kadr_style(
+      trg_el, trg_top, trg_bot,
+      img_el, img_top, img_bot, img_mid
+    ){
+      const img_w = img_el.naturalWidth
+      const img_h = img_el.naturalHeight
+      const img_t = img_top
+      const img_b = img_bot
+      const img_c = img_mid
+
+      const trg_w = trg_el.clientWidth
+      const trg_h = trg_el.clientHeight
+      const trg_t = trg_top
+      const trg_b = trg_bot
+      const trg_c = 0.5
+
+      return kadr_data_to_style(
+        trg_w, trg_h, trg_t, trg_b, trg_c,
+        img_w, img_h, img_t, img_b, img_c
+      )
+    }
+
+    function kadr_raw_to_style(
+      trg_el, trg_top, trg_bot,
+      img_el, raw_kadr_data
+    ){
+      const kadr_data = raw_kadr_data.split(';')
+      const img_top = parseFloat(kadr_data[0])
+      const img_bot = parseFloat(kadr_data[1])
+      const img_mid = parseFloat(kadr_data[2])
+
+      return kadr_style(
+        trg_el, trg_top, trg_bot,
+        img_el, img_top, img_bot, img_mid
+      )
+    }
+
+    function kadr_pixi(
+      trg, trg_top, trg_bot,
+      img, img_top, img_bot, img_mid
+    ) {
+      const trg_w = trg.width
+      const trg_h = trg.height
+      const trg_s = trg_bot - trg_top
+      const img_w = img.texture.width
+      const img_h = img.texture.height
+      const img_s = img_bot - img_top
+      const scale = (trg_s * trg_h) / (img_s * img_h)
+
+      const y = trg_h * (trg_top - 0.5) + scale * img_h * (0.5 - img_top)
+      const x = scale * img_w * (0.5 - img_mid)
+      const pos = {x, y}
+
+      return {scale, pos}
+    }
+
+  </script>
+
+  <!-- ROSTER DRAG -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const roster_wrap = document.querySelector('.roster_wrap')
+      let dragFunc = null
+
+      roster_wrap.addEventListener('mousedown', e => {
+        const m0 = e.x
+        const offset = roster_wrap.scrollLeft + m0
+        dragFunc = e => {
+          const m1 = e.x
+          if (Math.abs(m1 - m0) > 2) {
+            vars.roster_drag = true
+          }
+          roster_wrap.scrollLeft = offset - m1
+        }
+      })
+
+      window.addEventListener('mouseup', e => {
+        dragFunc = null
+        console.log('drag mouse up')
+      })
+
+      window.addEventListener('mousemove', e => {
+        if (dragFunc) {dragFunc(e)}
+      })
+
+      vars.updateRosterScroll = function updateRosterScroll(src) {
+        const div = vars.imgs[src].div
+        roster_wrap.scrollLeft = div.offsetLeft + (div.offsetWidth - roster_wrap.offsetWidth)/2
+      }
+    })
+  </script>
+{% endblock js %}

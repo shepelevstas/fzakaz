@@ -1,0 +1,214 @@
+{% extends 'kadr/base.html' %}
+
+{% load static %}
+
+{% block content %}
+  <div class="position-sticky top-0 shadow bg-white p-2 z-1">
+    <div class="container d-flex justify-content-between align-items-center">
+      <h4 class="m-0">{{album}}</h4>
+      <button class="btn btn-success save_names">
+        <i class="bi bi-cassette-fill"></i>&nbsp;&nbsp;Сохранить
+      </button>
+    </div>
+  </div>
+
+  <div class="p-2 d-flex flex-wrap justify-content-center bg-body-secondary">
+
+    {% for uu, i in ports.items %}
+      <div class="card shadow shadow-sm m-2" style="width:200px;">
+        <div
+          class="card-img-top overflow-hidden position-relative"
+          style="aspect-ratio:1;"
+          data-guides="0.1;0.9;0.5"
+        >
+          <img
+            class="position-absolute"
+            style="width:100%;"
+            src="{{i.minisrc}}"
+            {% if i.guides %}data-guides="{{i.guides}}"{% endif %}
+          >
+        </div>
+
+        <div class="card-img-overlay p-1" style="aspect-ratio:1;">
+          <h5 class="text-info">{{i.imgname}}</h5>
+        </div>
+
+        <div class="card-body p-2">
+          <input
+            type="text"
+            class="form-control fio"
+            name="{{uu}}"
+            value="{{i.name}}">
+        </div>
+      </div>
+    {% endfor %}
+
+  </div>
+
+
+  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3">
+    <div id="saved_toast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          Сохранено
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+
+    <div id="failed_toast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          Ошибка
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
+
+{% block js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      document.querySelectorAll('div[data-guides] img[data-guides]').forEach(updateImg)
+
+      const save_btn = document.querySelectorAll('button.save_names').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const names = {}
+          Array.from(document.querySelectorAll('input.fio')).forEach(el=>{
+            names[el.name] = el.value
+          })
+          postJson("{{ request.path }}", {names}).then(res=>res.text()).then(text=>{
+            console.log('save_names', text)
+            if (text === 'OK') {
+              bootstrap.Toast.getOrCreateInstance(document.querySelector('#saved_toast')).show()
+            } else if (text === 'FAIL') {
+              bootstrap.Toast.getOrCreateInstance(document.querySelector('#failed_toast')).show()
+            }
+          })
+        })
+      })
+
+    })
+
+    function kadr_data_to_style(
+      trg_w, trg_h, trg_t, trg_b, trg_c,
+      img_w, img_h, img_t, img_b, img_c)
+    {
+      /*
+        trg_w - trg frame width px [152]
+        trg_h - trg frame height px [203]
+        trg_t - trg frame top guide line [0.11]
+        trg_b - trg frame bottom guide line [0.66]
+        trg_c - trg frame middle vertical guide line [0.5]
+        img_w - pasted image width px [3500]
+        img_h - pasted image height px [2700]
+        img_t - pasted image top guide line [0.22]
+        img_b - pasted image bottom guide line [0.55]
+        img_c - pasted image middle vertical guide line [0.43]
+      */
+      //console.log(trg_w, trg_h, img_w, img_h)
+
+      const trg_r = trg_w / trg_h
+      const trg_s = trg_b - trg_t
+      const trg_k = trg_r / trg_s
+
+      const img_r = img_w / img_h
+      const img_s = img_b - img_t
+      const img_k = img_r / img_s
+
+      const k = img_k / trg_k
+
+      const w = k
+      const l = 0.5 - k * img_c
+      const t = trg_t - img_t * trg_s / img_s
+
+      return {
+        width: w * 100 + '%',
+        left: l * 100 + '%',
+        top: t * 100 + '%',
+      }
+    }
+
+    function kadr_style(
+      trg_el, trg_top, trg_bot, trg_mid,
+      img_el, img_top, img_bot, img_mid
+    ){
+      const img_w = img_el.naturalWidth
+      const img_h = img_el.naturalHeight
+      const trg_w = trg_el.clientWidth
+      const trg_h = trg_el.clientHeight
+
+      return kadr_data_to_style(
+        trg_w, trg_h, trg_top, trg_bot, trg_mid,
+        img_w, img_h, img_top, img_bot, img_mid
+      )
+    }
+
+    function kadr_raw_to_style(
+      trg_el, trg_top, trg_bot,
+      img_el, raw_kadr_data
+    ){
+      const kadr_data = raw_kadr_data.split(';')
+      const img_top = parseFloat(kadr_data[0])
+      const img_bot = parseFloat(kadr_data[1])
+      const img_mid = parseFloat(kadr_data[2])
+
+      return kadr_style(
+        trg_el, trg_top, trg_bot, 0.5,
+        img_el, img_top, img_bot, img_mid
+      )
+    }
+
+    function updateImg(img_el) {
+      const raw_kadr_data = img_el.dataset.guides
+      const trg_el = img_el.parentElement
+      const guides = trg_el.dataset.guides.split(';')
+      const trg_top = parseFloat(guides[0])
+      const trg_bot = parseFloat(guides[1])
+
+      const update = () => {
+        const style = kadr_raw_to_style(
+          trg_el, trg_top, trg_bot,
+          img_el, raw_kadr_data
+        )
+
+        img_el.style.width = style.width
+        img_el.style.left = style.left
+        img_el.style.top = style.top
+      }
+
+      if ('complete' in img_el && img_el.complete)
+        update()  // for disk cached imgs
+      else
+        img_el.addEventListener('load', update)  // for long loading imgs
+    }
+
+    function postData(url, jsonData) {
+      const data = new FormData()
+      data.set('csrfmiddlewaretoken', '{{ csrf_token }}')
+      for (let k in jsonData) {data.set(k, jsonData[k])}
+      return fetch(url, {
+        method: 'POST',
+        body: data,
+        headers: {
+          //'Content-Type': 'application',
+          'X-CSRFToken': '{{ csrf_token }}',
+        }
+      })
+    }
+
+    function postJson(url, jsonData) {
+      return fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(jsonData),
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'Content-Type': 'application/json',
+        },
+      })
+    }
+
+  </script>
+{% endblock js %}

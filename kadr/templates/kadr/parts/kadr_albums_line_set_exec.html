@@ -1,0 +1,14 @@
+<div class="d-inline-flex">
+  <span class="btn badge rounded-0 text-bg-primary dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">Назначить</span>
+
+  <ul class="dropdown-menu shadow">
+    {% for uu,un in users.items %}
+      <li><a href="#" class="dropdown-item"
+        hx-post="{{request.path}}"
+        hx-target="closest div"
+        hx-swap="outerHTML"
+        hx-vals='js:{"album":"{{i.album}}","item":"{{item.name}}","action":"set_exec","value":"{{uu}}"}'
+      >{{ un }}</a></li>
+    {% endfor %}
+  </ul>
+</div>

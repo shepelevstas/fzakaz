@@ -1,12 +1,15 @@
 {% extends 'base.html' %}
 
+{% block title %}fZ - {{album.name}} {{album.get_img}}{% endblock title %}
+
 {% block js %}
   <script>
-    ;document.addEventListener('DOMContentLoaded', (event) => {
+    ;document.addEventListener('DOMContentLoaded', () => {
 
       const inputs = document.querySelectorAll('input[type=number][data-price]')
       const totals = document.querySelectorAll('.total_sum')
       const subm_btn = document.querySelector('button#submit_btn')
+      const cancel_btns = document.querySelectorAll('button[value="cancel_order"]')
       const order_form = document.querySelector('form#order_form')
       const form_subm = document.querySelector('button#form_subm_btn')
       const eport0 = document.querySelectorAll('.eport0')
@@ -24,45 +27,48 @@
       function calcSum(e) {
         const sum = calc()
         totals.forEach(i=>i.textContent=sum)
-        if (sum >= 1500) {
+        if (sum >= {{goods.BONUS.sum}}) {
           eport0.forEach(i=>i.classList.add('d-none'))
           eport1.forEach(i=>i.classList.remove('d-none'))
         } else {
           eport0.forEach(i=>i.classList.remove('d-none'))
           eport1.forEach(i=>i.classList.add('d-none'))
         }
+        return sum
       }
 
       inputs.forEach(input=>input.addEventListener('change', calcSum))
 
       function plus_click(e) {
         e.preventDefault()
+        {% if not album.is_closed %}
         const name = e.target.dataset.name
         const input = document.querySelector(`input[type=number][name="${name}"]`)
         input.value = (Number(input.value)||0)+1
         const span = document.querySelector(`span[data-name="${name}"]`)
         if (span) {span.textContent = input.value}
         calcSum(e)
+        {% endif %}
       }
 
       function minus_click(e) {
         e.preventDefault()
+        {% if not album.is_closed %}
         const name = e.target.dataset.name
         const input = document.querySelector(`input[type=number][name="${name}"]`)
         input.value = Math.max((Number(input.value)||0)-1, 0)
         const span = document.querySelector(`span[data-name="${name}"]`)
         if (span) {span.textContent = input.value}
         calcSum(e)
+        {% endif %}
       }
 
       btns_plus.forEach(btn=>btn.addEventListener('click', plus_click))
       btns_minus.forEach(btn=>btn.addEventListener('click', minus_click))
 
-      calcSum()
-
-      subm_btn.addEventListener('click', (e) => {
-        form_subm.click()
-      })
+      if (calcSum()) {
+        cancel_btns.forEach(el => el.classList.remove('d-none'))
+      }
 
       const inputs_arr = Array.from(inputs)
 
@@ -82,26 +88,32 @@
 {% endblock js %}
 
 {% block content %}
-
-  <div class="position-sticky top-0 z-1 shadow-sm">
-    <nav class="navbar bg-light pb-0">
+  <div class="position-sticky top-0 z-3 shadow bg-white">
+    <nav class="navbar pb-0">
       <div class="container-fluid justify-content-center pb-2 border-bottom">
-        <h5 class="mb-0 me-2">Заказ фотопродукции</h5>
+        <h5 class="mb-0 me-2">{% if album.is_closed %}<strong class="text-danger-emphasis">ПРИЕМ ЗАКАЗОВ ЗАКРЫТ</strong>{% else %}Заказ фотопродукции{% endif %}</h5>
         <span class="flex-grow-1"></span>
         <span class="d-flex align-items-center">
           <strong class="total_sum me-1">0</strong>
           <strong class="text-secondary me-2">руб</strong>
-          <button id="submit_btn" class="btn btn-outline-success">Сохранить заказ</button>
+          {% if not album.is_closed %}
+            <button id="submit_btn" name="action" value="save" form="order_form" class="btn btn-outline-success">
+              Сохранить заказ
+            </button>
+            <button class="btn btn-outline-danger d-none ms-2" name="action" value="cancel_order" form="order_form">
+              Отменить
+            </button>
+          {% endif %}
         </span>
       </div>
 
       <div class="d-none d-md-block w-100">
-        <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
-          При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+        <div class="eport0 container-fluid justify-content-center text-center bg-primary text-white py-2 d-none">
+          {{goods.BONUS.text}}
         </div>
 
-        <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
-          Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+        <div class="eport1 container-fluid justify-content-center text-center bg-success text-white py-2 d-none">
+          {{goods.BONUS.success}}
         </div>
       </div>
     </nav>
@@ -109,11 +121,11 @@
 
   <div class="d-block d-md-none w-100">
     <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
-      При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+      {{goods.BONUS.text}}
     </div>
 
     <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
-      Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+      {{goods.BONUS.success}}
     </div>
   </div>
 
@@ -123,53 +135,56 @@
 
       <div class="row">
       {% for good_name, item in goods.items %}
-        <div class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4">
-          <div class="card shadow">
-            {% if "style" in item %}
-              <div class="card-img-top"
-              style="background-image:url('{{blank}}');{{item.style}}"></div>
-            {% endif %}
-            <div class="card-body">
-              <h5 class="card-title"><strong>{{item.title}}</strong></h5>
-              {% for name, good in item.amounts.items %}
-                <!-- name: {{ name }} -->
-                <div class="row border-bottom">
+        {% if not good_name == 'BONUS' %}
+          <div class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4">
+            <div class="card shadow">
+              {% if "style" in item or "blank_img_style" in item %}
+                <div class="card-img-top"
+                style="background-image:url('{{blank}}');{% if item.blank_img_style %}{{item.blank_img_style}}{% else %}{{item.style}}{% endif %}">
+                </div>
+              {% endif %}
+              <div class="card-body">
+                <h5 class="card-title"><strong>{{item.title}}</strong></h5>
+                {% for name, good in item.amounts.items %}
+                  <!-- name: {{ name }} -->
+                  <div class="row border-top">
 
-                  <div class="col-4 d-flex align-items-center">{{good.title}}</div>
-                  <div class="col-4 d-flex align-items-center justify-content-center">
-                    {% if name == 'tsize' %}
-                      <span class="text-secondary">см</span>
-                    {% else %}
-                      {{good.price}} <span class="text-secondary ms-1">руб</span>
-                    {% endif %}
-                  </div>
-                  <div class="col-4 d-flex align-items-center">
-
-                    <div class="input-group input-group-sm">
+                    <div class="col-4 d-flex align-items-center">{{good.title}}</div>
+                    <div class="col-4 d-flex align-items-center justify-content-center">
                       {% if name == 'tsize' %}
+                        <span class="text-secondary">см</span>
                       {% else %}
-                        <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-minus="1"><i class="bi bi-dash-lg" data-name="{{good_name}}_{{name}}"></i></button>
-                      {% endif %}
-
-                      {% if name == 'tsize' %}
-                        <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control" value="{{good.q}}" data-price="{{good.price}}">
-                      {% else %}
-                        <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control d-none" value="{{good.q}}" data-price="{{good.price}}">
-
-                        <span class="input-group-text fw-bold" data-name="{{good_name}}_{{name}}">{{good.q}}</span>
-                      {% endif %}
-
-                      {% if name == 'tsize' %}
-                      {% else %}
-                        <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                        {{good.price}} <span class="text-secondary ms-1">руб</span>
                       {% endif %}
                     </div>
+                    <div class="col-4 d-flex align-items-center">
+
+                      <div class="input-group input-group-sm flex-nowrap">
+                        {% if name == 'tsize' %}
+                        {% else %}
+                          <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-minus="1"><i class="bi bi-dash-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                        {% endif %}
+
+                        {% if name == 'tsize' %}
+                          <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control" value="{{good.q}}" data-price="{{good.price}}">
+                        {% else %}
+                          <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control d-none" value="{{good.q}}" data-price="{{good.price}}">
+
+                          <span class="input-group-text fw-bold" data-name="{{good_name}}_{{name}}">{{good.q}}</span>
+                        {% endif %}
+
+                        {% if name == 'tsize' %}
+                        {% else %}
+                          <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                        {% endif %}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              {% endfor %}
+                {% endfor %}
+              </div>
             </div>
           </div>
-        </div>
+        {% endif %}
       {% endfor %}
       </div>
 
@@ -188,7 +203,14 @@
             <strong class="total_sum">0</strong>
             <strong class="text-secondary me-2">руб</strong>
           </div>
-          <button id="form_subm_btn" class="btn btn-outline-success">Сохранить заказ</button>
+          {% if not album.is_closed %}
+            <button id="form_subm_btn" name="action" value="save" class="btn btn-outline-success">
+              Сохранить заказ
+            </button>
+            <button class="btn btn-outline-danger d-none ms-2" name="action" value="cancel_order" form="order_form">
+              Отменить
+            </button>
+          {% endif %}
         </div>
       </div>
     </form>
@@ -197,11 +219,11 @@
 
   <div class="d-block d-md-none w-100">
     <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
-      При заказе от 1500р - электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+      {{goods.BONUS.text}}
     </div>
 
     <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
-      Электронный портрет в подарок! Не забудьте указать адрес своей электронной почты.
+      {{goods.BONUS.success}}
     </div>
   </div>
 

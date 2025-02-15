@@ -1,0 +1,68 @@
+{% extends "base2.html" %}
+
+{% load mytags %}
+
+{% block title %}fZ - Money Table{% endblock title %}
+
+{% block topbar_content %}
+  <h2 class="m-0">Таблица {{album.name}} ({{album.session}}) [{{album.ordered_count}}/{{album.blanks_count}}]</h2>
+{% endblock topbar_content %}
+
+{% block container %}
+  <div class="row">
+    <div class="col">
+      <table class="table table-striped d-block overflow-scroll mw-100 border-start border-end">
+        <thead>
+          <tr class="text-center">
+            <th class="position-sticky start-0"></th>
+            <th class="position-sticky border-end" style="left:34px;"></th>
+            <th>Сумма</th>
+
+            {% for item, col in album.get_money_table.cols.items %}
+              <th>{{col.format}} "{{col.theme}}" ({{col.price}}₽)</th>
+            {% endfor %}
+
+          </tr>
+        </thead>
+
+        <tbody>
+
+          <tr class="text-center">
+            <th class="position-sticky start-0">№</th>
+            <th class="position-sticky border-end" style="left:34px;">Бланк</th>
+            <th>{{album.get_money_table.total}}₽</th>
+
+            {% for item, col in album.get_money_table.cols.items %}
+              <th>{{col.q}}</th>
+            {% endfor %}
+          </tr>
+
+          {% for img, row in album.get_money_table.rows.items %}
+            <tr class="text-center">
+              <td class="position-sticky start-0">{{forloop.counter}}</td>
+              <td class="position-sticky border-end" style="left:34px;">
+                <a href="{% url 'zakaz' album.session album.sh album.shyear album.group row.uuid %}">
+                  {{img}}
+                </a>
+              </td>
+              <td>{{row.total}}₽</td>
+              {% for item in album.get_money_table.cols %}
+                <td>{{row.items|lookup:item|default:""}}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-none">
+    <h6>cols</h6>
+    <code>{{album.get_money_table.cols}}</code>
+
+    <h6>rows</h6>
+    <code>{{album.get_money_table.rows}}</code>
+  </div>
+
+{% endblock container %}

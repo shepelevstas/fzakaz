@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 
+{% block title %}fZ - {{album.name}}{% endblock title %}
+
 {% block js %}
   <script>
     ;document.addEventListener('DOMContentLoaded', () => {
@@ -41,9 +43,9 @@
 
 {% block body %}
 
-  {% if s %}
+  {% if sh %}
     <div class="position-sticky top-0 shadow bg-white">
-      <h2 class="text-center">Школа {{s}}, класс {{c}}</h2>
+      <h2 class="text-center">[{{ses}}] Школа {{sh}}, класс {{shyear}}{{group}}</h2>
     </div>
   {% endif %}
 
@@ -66,8 +68,14 @@
 
     {% if blanks %}
       {% for blk in blanks %}
-        <a href="{% url 'zakaz' s c blk.uuid %}">
-          <img src="/media/blanks/{{s}}/{{c}}/{{blk.uuid}}/{{blk.blk}}" style="width:150px;">
+        <a href="{% url 'zakaz' ses sh shyear group blk.uuid %}" class="m-1 shadow-sm">
+          {% if blk.style %}
+            <div
+              style="width: 150px;background-image:url(/media/blanks/{{ses}}/{{sh}}/{{shyear}}{{group}}/{{blk.uuid}}/{{blk.blk}});{{blk.style}}"
+            ></div>
+          {% else %}
+            <img src="/media/blanks/{{ses}}/{{sh}}/{{shyear}}{{group}}/{{blk.uuid}}/{{blk.blk}}" style="width:150px;">
+          {% endif %}
         </a>
       {% endfor %}
 
@@ -80,7 +88,7 @@
     {% endif %}
 
     {% if message %}
-      <strong class="text-secondary">{{message}}</strong>
+      <strong class="text-secondary p-5 m-5">{{message}}</strong>
     {% endif %}
   </div>
 
