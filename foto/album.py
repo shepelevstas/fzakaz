@@ -236,6 +236,37 @@ PRICELISTS = {
 }
 
 
+pricelist2 = {
+  'version': 2,
+  'ru': 'Весна 2025',
+  'en': '2025_vesna'
+  'formats': {
+    'f10':    {'ru': 'Фото 10х15',   'price': 400,  'q':0, 'en': '10x15'},
+    "f15":    {"ru": "Фото 15х23",   "price": 450,  "q":0, 'en': '15x23'},
+    "f20":    {"ru": "Фото 20х30",   "price": 500,  "q":0, 'en': '20x30'},
+    "f30":    {"ru": "Фото 30х42",   "price": 600,  "q":0, 'en': '30x42'},
+    "m10":    {"ru": "Магнит 10х15", "price": 500,  "q":0, 'en': 'm10x15'},
+    "m15":    {"ru": "Магнит 15х23", "price": 600,  "q":0, 'en': 'm15x23'},
+    "pill":   {"ru": "Подушка",      "price": 1200, "q":0, 'en': 'podushka'},
+    "mug":    {"ru": "Кружка",       "price": 800,  "q":0, 'en': 'krujka'},
+    "tshirt": {"ru": "Футболка",     "price": 1200, "q":0, 'en': 'futbolka'},
+    "tsize":  {"ru": "Обхват груди", "price": 0,    "q":0, 'en': 'razmer'},
+  },
+  'themes': {
+    '8mar': {'ru': '8 Марта', "blank_img_style": "aspect-ratio:8/12;background-size:201%;", 'formats': ['*']},
+    '23feb': {'ru': '23 Февраля', "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;"},
+    '9may': {'ru': '9 Мая', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
+    'pozdr': {'ru': 'Поздравляю!', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
+  },
+  'bonus': {
+    "text": "При заказе от %(sum)s₽ - все четыре электронные фото - в подарок!",
+    "success": "Все четыре электронные фото - в подарок!",
+    "sum": 2000,
+  },
+  'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
+}
+
+
 
 class Album:
 
@@ -272,11 +303,6 @@ class Album:
     gr = yrgr[-1]
     return cls(ses, sh, yr, gr)
 
-  @property
-  @lru_cache
-  def is_closed(self):
-    return (self.blanks_cls / 'closed').is_file() or self.is_deleted
-
   def close(self):
     return (self.blanks_cls / 'closed').open('a').close()
 
@@ -293,6 +319,11 @@ class Album:
     file = self.blanks_cls / 'deleted'
     if file.is_file():
       return file.unlink()
+
+  @property
+  @lru_cache
+  def is_closed(self):
+    return (self.blanks_cls / 'closed').is_file() or self.is_deleted
 
   @property
   @lru_cache
