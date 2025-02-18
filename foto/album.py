@@ -1,6 +1,7 @@
 import shutil
 from functools import lru_cache
 from copy import deepcopy
+from datetime import datetime
 
 from django.conf import settings
 from django.core.signing import Signer, BadSignature
@@ -13,6 +14,7 @@ try:
 except ImportError:
   from backports import zoneinfo
 
+zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
 
 signer = Signer()
 
@@ -239,7 +241,7 @@ PRICELISTS = {
 pricelist2 = {
   'version': 2,
   'ru': 'Весна 2025',
-  'en': '2025_vesna'
+  'en': '2025_vesna',
   'formats': {
     'f10':    {'ru': 'Фото 10х15',   'price': 400,  'q':0, 'en': '10x15'},
     "f15":    {"ru": "Фото 15х23",   "price": 450,  "q":0, 'en': '15x23'},
@@ -346,6 +348,23 @@ class Album:
       'style': style,
     } for i in self.blanks_dir.iterdir() if i.is_dir()]
 
+  @property
+  @lru_cache
+  def last_order_time(self):
+    res = None
+    for f in self.blanks_dir.iterdir():
+      if not f.is_dir(): continue
+      json = self.get_order_file(uuid=f.name)
+      if not json: continue
+      data = read_order(json, format=self.order_format)
+      date = data.get('date')
+      if date:
+        date = datetime.fromisoformat(date)
+      else:
+        date = datetime.fromtimestamp(json.stat().st_mtime).astimezone(zone)
+      res = date if res is None else max(res, date)
+    return res
+
   @lru_cache
   def get_blank_file(self, uuid=None):
     uuid = uuid or self.uuid
@@ -390,7 +409,7 @@ class Album:
     f = self.get_order_file(uuid, True)
     if not f.parent.is_dir():
       f.parent.mkdir(parents=True, exist_ok=True)
-    zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
+    # zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
     date = tz.now().replace(microsecond=0).astimezone(zone).isoformat()
     order['date'] = date
     save_order(f, order, self.order_format)
@@ -607,6 +626,46 @@ class Album:
       'rows': rows,
       'total': total,
     }
+
+  def get_csv_content(self):
+
+    fix_e = lambda s: s.replace(chr(203), 'Ё').replace(chr(235), 'ё')
+
+    data = self.get_money_table()
+
+    title = ['', f'Школа {self.sh} Класс {self.shyear} "{self.group.upper()}"'] + [''] * (1 + len(data['cols']))
+
+    empty = [''] * (3 + len(data['cols']))
+
+    header = ['', ''] + [
+      f'{col["format"]} "{col["theme"]}" ({col["price"]}р.)'
+      for col_k, col in data['cols'].items()
+    ] + ['Сумма']
+
+    meat = [
+      [f'{i}', f'{fix_e(row["contact"]["name"])}'] + [
+        f"{row['items'].get(col_k) or ''}"
+        for col_k, col in data['cols'].items()
+      ] + [f'{row["total"]}р.']
+      for i, (row_k, row) in enumerate(data['rows'].items(), start=1)
+    ]
+
+    total = ['', 'Всего'] + [
+      f"{col['q']}"
+      for col in data['cols'].values()
+    ] + [f'{data["total"]}р.']
+
+    table = [
+      title,
+      empty,
+      header,
+      *meat,
+      total,
+    ]
+
+    table = '\n'.join(';'.join(row) for row in table)
+
+    return table.encode('cp1251')
 
   def cancel_order(self, uuid=None):
     uuid = uuid or self.uuid

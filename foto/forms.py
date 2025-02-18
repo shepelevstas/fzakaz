@@ -41,6 +41,12 @@ class ContactInfoForm(forms.Form):
     widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "ФИО РЕБЁНКА"}),
   )
 
+  def clean_name(self):
+    name = self.cleaned_data['name']
+    name = name.replace(chr(203), 'Ё').replace(chr(235), 'ё')
+    return name
+
+
 
 # class BSCharField(forms.CharField):
 #   def __init__(self, *args, **kwargs):

@@ -406,13 +406,18 @@ def money_table(request, session, sh, shyear, group, code):
   })
 
 
-def orders_file(req, sign):
+def orders_file(req, sign, format='excel'):
   album = Album.from_sign(sign)
 
-  content = json.dumps(album.get_money_table(), ensure_ascii=False)
+  if format == 'json':
+    content = json.dumps(album.get_money_table(), ensure_ascii=False)
+    filename = f"{album.id}.json"
+  elif format == 'excel':
+    content = album.get_csv_content()
+    filename = f"{album.id}.csv"
 
   res = HttpResponse(content, content_type='application/text charset=utf-8')
-  res['Content-Disposition'] = f'attachment; filename="{album.id}.json"'.encode()
+  res['Content-Disposition'] = f'attachment; filename="{filename}"'.encode()
 
   return res
 
