@@ -6,6 +6,17 @@
 
 {% block topbar_content %}
   <h2 class="m-0">Таблица {{album.name}} ({{album.session}}) [{{album.ordered_count}}/{{album.blanks_count}}]</h2>
+  <form action="." class="ms-3 d-flex">
+    <div class="input-group input-group-sm">
+      <input type="date" name="after" value="{{request.GET.after}}" class="form-control">
+      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+    </div>
+    <div class="input-group input-group-sm ms-2">
+      <button name="download" class="btn btn-sm btn-outline-success" title="Скачать таблицу">
+        <i class="bi bi-download"></i>
+      </button>
+    </div>
+  </form>
 {% endblock topbar_content %}
 
 {% block container %}
@@ -41,9 +52,11 @@
             <tr class="text-center">
               <td class="position-sticky start-0">{{forloop.counter}}</td>
               <td class="position-sticky border-end" style="left:34px;">
+                <strong>{{ row.contact.name }}</strong>
                 <a href="{% url 'zakaz' album.session album.sh album.shyear album.group row.uuid %}">
                   {{img}}
                 </a>
+                <small class="text-black-50">{{row.date|default:"N/D"}}</small>
               </td>
               <td>{{row.total}}₽</td>
               {% for item in album.get_money_table.cols %}

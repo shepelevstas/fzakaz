@@ -90,12 +90,12 @@
               </a>
             {% endif %}
 
-            <a href="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" class="">
-              {{album.name}}
-            </a>
-            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}/{{album.signed_url}}" title="Копировать ссылку">
+            <a href="{% url 'signed_view' album.sign %}">{{album.name}}</a>
+            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'signed_view' album.sign %}">
+              {% comment %} <i class="bi bi-link-45deg"></i> {% endcomment %}
               <i class="bi bi-copy"></i>
             </button>
+
             {% comment %} <a href="{{request.scheme}}://{{request.get_host}}/money_table/{{album.signed_url}}" class="btn btn-sm"><i class="bi bi-table"></i></a> {% endcomment %}
             <a href="{{request.scheme}}://{{request.get_host}}/{{album.money_table_url}}">
               <i class="bi bi-table"></i>

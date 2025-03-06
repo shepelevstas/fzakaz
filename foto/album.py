@@ -8,6 +8,7 @@ from django.core.signing import Signer, BadSignature
 from django.utils import timezone as tz
 
 from utils.io import save_order, read_order
+from utils import log
 
 try:
   import zoneinfo
@@ -18,6 +19,10 @@ zone = zoneinfo.ZoneInfo('Asia/Krasnoyarsk')
 
 signer = Signer()
 
+translit = str.maketrans(
+  'фотхмагнипдушкржблв еёзсчцщюыъьэяй',
+  "fotxmagnipdyskrjblv_eezs4csui''qji"
+)
 
 
 price_2023_fall = {
@@ -90,8 +95,8 @@ price_2023_fall = {
     },
 
     "BONUS": {
-      "text": "При заказе от 2000р - все четыре электронные фото - в подарок!",
-      "success": "Все четыре электронные фото - в подарок!",
+      "text": "При заказе от 2000р - электронное фото - в подарок!",
+      "success": "Электронное фото - в подарок!",
       "sum": 2000,
     },
   }
@@ -161,6 +166,12 @@ PRICELISTS = {
         "set":  {"title": "Выгодный комплект (портрет, коллаж и виньетка 20х30)", "price": 800, "q":0},
       },
       "style": "aspect-ratio:1205/1795;background-size:100%;background-position:center;",
+    },
+
+    "BONUS": {
+      "text": "При заказе от 1500р - электронное фото - в подарок!",
+      "success": "Электронное фото - в подарок!",
+      "sum": 1500,
     },
   },
   'price_2023_fall': price_2023_fall,
@@ -235,48 +246,201 @@ PRICELISTS = {
       "sum": 2000,
     },
   },
+  'price_2025_spring_v2': {
+    'version': 'vesna25',
+    'ru': 'Весна 2025',
+    'en': '2025_vesna',
+    'formats': {
+      'f10':    {'ru': 'Фото 10х15',   'price': 400,  'en': '10x15'},
+      "f15":    {"ru": "Фото 15х23",   "price": 450,  'en': '15x23'},
+      "f20":    {"ru": "Фото 20х30",   "price": 500,  'en': '20x30'},
+      "f30":    {"ru": "Фото 30х42",   "price": 600,  'en': '30x42'},
+      "m10":    {"ru": "Магнит 10х15", "price": 500,  'en': 'm10x15'},
+      "m15":    {"ru": "Магнит 15х23", "price": 600,  'en': 'm15x23'},
+      "pill":   {"ru": "Подушка",      "price": 1200, 'en': 'podushka'},
+      "mug":    {"ru": "Кружка",       "price": 800,  'en': 'krujka'},
+      "tshirt": {"ru": "Футболка",     "price": 1200, 'en': 'futbolka'},
+      "tsize":  {"ru": "Обхват груди", "price": 0,    'en': 'razmer'},
+    },
+    'themes': {
+      '8mar': {
+        'ru': '8 Марта',
+        "blank_img_style": "aspect-ratio:8/12;background-size:201%;",
+        'formats': ['*'],
+      },
+      '23feb': {'ru': '23 Февраля', "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;"},
+      '9may': {'ru': '9 Мая', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
+      'pozdr': {'ru': 'Поздравляю!', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
+    },
+    'bonus': {
+      "text": "При заказе от %(sum)s₽ - все четыре электронные фото - в подарок!",
+      "success": "Все четыре электронные фото - в подарок!",
+      "sum": 2000,
+    },
+    'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
+  }
 }
 
 
-pricelist2 = {
-  'version': 2,
-  'ru': 'Весна 2025',
-  'en': '2025_vesna',
-  'formats': {
-    'f10':    {'ru': 'Фото 10х15',   'price': 400,  'q':0, 'en': '10x15'},
-    "f15":    {"ru": "Фото 15х23",   "price": 450,  "q":0, 'en': '15x23'},
-    "f20":    {"ru": "Фото 20х30",   "price": 500,  "q":0, 'en': '20x30'},
-    "f30":    {"ru": "Фото 30х42",   "price": 600,  "q":0, 'en': '30x42'},
-    "m10":    {"ru": "Магнит 10х15", "price": 500,  "q":0, 'en': 'm10x15'},
-    "m15":    {"ru": "Магнит 15х23", "price": 600,  "q":0, 'en': 'm15x23'},
-    "pill":   {"ru": "Подушка",      "price": 1200, "q":0, 'en': 'podushka'},
-    "mug":    {"ru": "Кружка",       "price": 800,  "q":0, 'en': 'krujka'},
-    "tshirt": {"ru": "Футболка",     "price": 1200, "q":0, 'en': 'futbolka'},
-    "tsize":  {"ru": "Обхват груди", "price": 0,    "q":0, 'en': 'razmer'},
-  },
-  'themes': {
-    '8mar': {'ru': '8 Марта', "blank_img_style": "aspect-ratio:8/12;background-size:201%;", 'formats': ['*']},
-    '23feb': {'ru': '23 Февраля', "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;"},
-    '9may': {'ru': '9 Мая', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
-    'pozdr': {'ru': 'Поздравляю!', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
-  },
-  'bonus': {
-    "text": "При заказе от %(sum)s₽ - все четыре электронные фото - в подарок!",
-    "success": "Все четыре электронные фото - в подарок!",
-    "sum": 2000,
-  },
-  'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
-}
+
+class PriceList:
+  def __init__(self, struct):
+    self.data = struct
+    self.ver = self.get_version()
+
+  @staticmethod
+  def from_name(pricelist_name):
+    if pricelist_name not in PRICELISTS:
+      pricelist_name = 'default'
+    return PriceList(PRICELISTS[pricelist_name])
+
+  def get_version(self):
+    if self.data.get('version'):
+      return self.data['version']
+
+    theme1 = next(self.data.values())
+
+    if 'amounts' in theme1:
+      if 'style' in theme1:
+        return '1.1'
+      if 'blank_img_style':
+        return '1.2'
+
+    return '1.0'
+
+  def get_blank_kadr(self, index=1):
+    if self.ver == '1.0':
+      return ""
+
+    if self.ver == '1.1':
+      return [self.data.values()][index]['style']
+
+    if self.ver == '1.2':
+      return [self.data.values()][index]['blank_img_style']
+
+    if self.ver == 'vesna25':
+      return [self.data['themes'].values()][index]['blank_img_style']
+
+    return ""
+
+  def get_bonus_text(self):
+    if self.ver == 'vesna25':
+      return self.data['bonus']['text'] % self.data['bonus']
+
+    if self.ver in ['1.2', '1.1']:
+      return self.data['BONUS']['text'] % self.data['BONUS']
+
+  def get_bonus_success(self):
+    if self.ver == 'vesna25':
+      return self.data['bonus']['success'] % self.data['bonus']
+
+    if self.ver in ['1.2', '1.1']:
+      return self.data['BONUS']['success'] % self.data['BONUS']
+
+  def get_formats(self, copy=False):
+    if self.ver == 'vesna25':
+      if copy:
+        return deepcopy(self.data['formats'])
+      return self.data['formats']
+
+    if self.ver in ['1.1', '1.2']:
+      formats = {}
+      for k,v in self.data.items():
+        if k == 'BONUS': continue
+        for amount_k, amount_item in v['amounts'].items():
+          item = {
+            'ru': amount_item['title'],
+            'en': amount_item.get('en') or amount_item['title'].lower().translate(translit),
+            'price': amount_item['price'],
+            # 'q': amount_item['q'],
+          }
+          if amount_k not in formats:
+            formats[amount_k] = item
+            continue
+      return formats
+
+  def get_themes(self):
+    if self.ver == 'vesna25':
+      for k,v in self.data['themes'].items():
+        if 'formats' not in v or v['formats'] == ['*']:
+          v['formats'] = list(self.data['formats'])
+      return self.data['themes']
+
+    if self.ver in ['1.1', '1.2']:
+      return {
+        k: {'ru': v['title'], 'formats': list(v['amounts']), 'blank_img_style': v.get('style') or v.get('blank_img_style') or ''}
+        for k,v in self.data.items()
+        if k != 'BONUS'
+      }
+
+  def get_empty_copy(self):
+    return deepcopy({
+      'themes': self.get_themes(),
+      'formats': self.get_formats(),
+      'cols': {},
+      'rows': {},
+      'total': 0,
+    })
+
+  def load_orders(self, orders):
+    '''
+        orders :: {
+          '<blankstem>': {
+            'uuid' : <str>,
+            'date' : <isoformat str>,
+            'items': { '<themeK_formatK>: <int> },
+            'name'
+            'tel'
+            'mail'
+          }
+        }
+
+        return :: {
+          'themes': {<th>:{'ru','formats'}},
+          'formats': {<fmt>:{'ru','en','price'}},
+          'cols': {<th_fmt>:{'theme','format','q','price'}},
+          'rows': {<stem>:{'name','tel','mail','uuid','date','size','total','items':{<th_fmt>:<int>}}},
+          'total': <int>,
+        }
+    '''
+    themes = self.get_themes()
+    formats = self.get_formats()
+    cols = {} # {<themeK_formatK>: {'theme':<Theme>, 'format':<Format>, 'q', 'price'}}
+    rows = {} # {<stem>: {'name','tel','mail','uuid','date','items':{<th_fmt>:q},'total','size'}}
+    total = 0
+
+    for stem, order in orders.items():
+      order['total'] = 0
+      for item, q in order['items'].items():
+        th, fmt = item.split('_')
+        if fmt == 'tsize':
+          order['size'] = q
+          continue
+        if item not in cols:
+          cols[item] = {'theme': themes[th], 'format': formats[fmt], 'q': 0, 'price': formats[fmt]['price']}
+        col = cols[item]
+        col['q'] += q
+        order['total'] += q * col['price']
+      total += order['total']
+      rows[stem] = order
+
+    return {
+      'themes': themes,
+      'formats': formats,
+      'cols': cols,
+      'rows': rows,
+      'total': total,
+    }
 
 
 
 class Album:
 
-  def __init__(self, session, sh, shyear, group, uuid=None, imgn=None):
+  def __init__(self, session, sh, shyear, group, uuid=None, imgn=None, after=''):
     shyear = str(shyear)
     self.session = session
     self.sh = sh
-    self.shyear = shyear
+    self.shyear = self.year = shyear
     self.group = group
     self.cls = group
     self.uuid = uuid
@@ -288,22 +452,24 @@ class Album:
     self.blanks_dir = self.blanks_cls
     self.order_format = 'json'
     self.orders_dir = settings.MEDIA_ROOT / 'orders'
+    self.after = after
 
   def __str__(self):
     return f'Album(<{self.session}__{self.sh}_{self.shyear}{self.group}>)'
 
   @classmethod
-  def from_sign(cls, sign):
+  def from_sign(cls, sign, **kw):
     ses__sh_yrgr = None
     try:
       ses__sh_yrgr = signer.unsign(sign)
     except:
+      log(f'[Album.from_sign FAIL]\n{sign=}')
       return
     ses, sh_yrgr = ses__sh_yrgr.split('__', 1)
     sh, yrgr = sh_yrgr.split('_', 1)
     yr = yrgr[:-1]
     gr = yrgr[-1]
-    return cls(ses, sh, yr, gr)
+    return cls(ses, sh, yr, gr, **kw)
 
   def close(self):
     return (self.blanks_cls / 'closed').open('a').close()
@@ -422,6 +588,33 @@ class Album:
     if not order_file:
       return None
     return read_order(order_file, format=self.order_format)
+
+  @staticmethod
+  def normalize_order(data, uuid, json_file):
+    '''
+        return :: {
+          'uuid' : <str>,
+          'date' : <isoformat str>,
+          'items': { '<themeK_formatK>: <int> },
+          'name'
+          'tel'
+          'mail'
+        }
+    '''
+    res = {'items': {}, 'uuid': uuid}
+
+    for k,v in date.items():
+      if '_' in k:
+        if isinstance(v, str) and not v.isdecimal():
+          continue
+        res['items'][k] = int(v)
+      else:
+        res[k] = v
+
+    if 'date' not in res:
+      res['date'] = datetime.fromtimestamp(json_file.stat().st_mtime).astimezone(zone).toisoformat()
+
+    return res
 
   @lru_cache
   def get_pricename(self, uuid=None):
@@ -577,8 +770,9 @@ class Album:
 
     for (img, uuid), b in blanks.items():
       if b is None: continue
+      if b.get('date', '') < self.after: continue
       row = {
-        'contact': {'tel': b['tel'], 'mail': b['mail'], 'name': b['name']},
+        'contact': {'tel': b['tel'], 'mail': b['mail'], 'name': b['name'].strip()},
         'total': 0,
         'img': img,
         'title': img,
