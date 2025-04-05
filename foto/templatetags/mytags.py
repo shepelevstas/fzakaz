@@ -6,6 +6,8 @@ register = template.Library()
 
 @register.filter
 def lookup(value, key):
+  if not isinstance(value, dict):
+    return None
   return value.get(key)
 
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,25 +9,26 @@
   <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
   {% block style %}{% endblock style %}
 </head>
+
 <body class="{% block body_class %}bg-body-secondary{% endblock body_class %}">
   {% block body %}
-    {% block topbar %}
-      <div class="position-sticky top-0 shadow bg-white p-2 z-1 d-flex align-items-center">
-        {% block topbar_content %}{% endblock topbar_content %}
-      </div>
-    {% endblock topbar %}
-    {% block content %}
-      <div class="container">
-        {% block container %}
-          <h3 class="text-secondary">base.html content > container</h3>
-        {% endblock container %}
-      </div>
-    {% endblock content %}
+  {% block topbar %}
+  <div class="position-sticky top-0 shadow bg-white p-2 z-1">
+    {% block topbar_content %}{% endblock topbar_content %}
+  </div>
+  {% endblock topbar %}
+  {% block content %}
+  <div class="container">
+    {% block container %}
+    <h3 class="text-secondary">base.html content > container</h3>
+    {% endblock container %}
+  </div>
+  {% endblock content %}
   {% endblock body %}
   {% block modal %}{% endblock modal %}
-  {% block js_libs %}
-    <script src="/static/js/bootstrap533.bundle.min.js"></script>
-  {% endblock js_libs %}
-  {% block script %}{% endblock script %}
+  {% block js %}
+  <script src="/static/js/bootstrap533.bundle.min.js"></script>
+  {% endblock js %}
 </body>
+
 </html>

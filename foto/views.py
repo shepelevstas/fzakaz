@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from uuid import uuid4
 from operator import itemgetter
@@ -6,77 +7,34 @@ import json
 from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
+#from django.contrib.auth.decorators import login_required
 from django.core.signing import Signer, BadSignature
 from django.conf import settings
 
 from utils import log
-from utils.io import save_order, read_order
+from utils.io import read_order
 from utils.trans import en, ru
 from utils.money import order_cost
 
 from .forms import ContactInfoForm, UploadBlanksForm
 from .album import Album
 
+from .models import Session, Order
+
 
 signer = Signer()
 
 
-# def signed_view(request, session, sh, year, group, code):
 def signed_view(request, sign):
-  ''' sign LIKE `158_1И_8810:2X-8h6e7DcsINNwlnWRLTpsr05abY9pgsTkPwwZHhh8`
-      '158_1А:vKw6vyj3opqhm46qsrvYgsHhrIpahSiTioqP-40YySw'
-      '158_1И:QWhCPQxnhyvBI0ezGKg43SbU_ozaQWua4DSo_GVg_uc'
+  ''' sign LIKE `Spring_2025__158_1И:2X-8h6e7DcsINNwlnWRLTpsr05abY9pgsTkPwwZHhh8`
   '''
   try:
     unsigned = signer.unsign(sign)
+    session, sh, year, group = re.match(r'(.+)__(.+)_(\d+)(\D)', unsigned).groups()
   except BadSignature:
     return HttpResponse('Код неверный'.encode())
 
-  session, rest = unsigned.split('__')
-  sh, year_group = rest.split('_')
-  year = year_group[:-1]
-  group = year_group[-1]
-
-  # year = str(year)
-  # print('sh',sh, 'year',year, 'group',group,'code',code)
-  # sign = f'{session}__{sh}_{year}{group}:{code}'
-
-  # try:
-  #   unsigned = Signer().unsign(sign)
-  #   print('[unsigned]', unsigned)
-
-  # except BadSignature:
-  #   return HttpResponse('Код неверный')
-
   return zakaz(request, session, sh, year, group)
-
-
-
-
-  album = Album(session, sh, year, group, None, None)
-
-
-
-  sh, *cls_img = unsigned.split('_')
-  cls = cls_img[0]
-
-  cls_dir = settings.MEDIA_ROOT / 'blanks'/sh.upper()/cls.upper()
-
-  img = uuid = None
-  if len(cls_img) == 2:
-    img = cls_img[1]
-
-  if img:
-    try:
-      uuid = next(d.name for d in cls_dir.iterdir() if list(d.glob(f'*{img}*.jpg')))
-
-    except StopIteration:
-      return HttpResponse('Такого бланка нет', 404)
-
-  print('[zakaz]', sh, cls, uuid)
-
-  return zakaz(request, session, sh, year, group, uuid)
 
 
 def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, imgn=None):
@@ -115,12 +73,13 @@ def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, im
 
   # ZAKAZ
 
-  contacts = ContactInfoForm(request.POST or album.get_order() or None)
+  contacts = ContactInfoForm(request.POST or album.get_order() or None, initial={'name': album.suggest_name()})
 
   order = None
 
   if request.method == 'POST':
     order = dict(i for i in request.POST.items() if i[0] not in ['csrfmiddlewaretoken', 'action'] and i[1] and i[1] != '0')
+    album.post_data = order
 
     if contacts.is_valid():
 
@@ -141,13 +100,11 @@ def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, im
       )
 
     else:
-      # import ipdb;ipdb.set_trace()
       print('NOT VALID ContactInfoForm')
       print(contacts.errors)
 
   return render(request, 'zakaz.html', {
-    "goods": album.get_goods(post_data=tuple(order.items()) if order else None),
-    "blank": album.get_blank_url(),
+    # "goods": album.get_goods(post_data=tuple(order.items()) if order else None),
     "contacts": contacts,
     "album": album,
   })
@@ -215,6 +172,24 @@ def upload(request):
     return JsonResponse({'data': album.get_json()})
 
 
+def manage_albums(req, edit=True):
+  from .models import Album
+  albums = Album.objects.select_related('session')
+  ses = req.GET.get('ses')
+  sh = req.GET.get('sh')
+  if ses:
+    year, _, name = ses.partition('_')
+    albums = albums.filter(session__year=year, session__name=name)
+  if sh:
+    albums = albums.filter(sh=sh)
+
+  return render(req, 'manage_albums.html', {
+    'albums': albums,
+    'form': UploadBlanksForm(),
+    'edit': edit,
+  })
+
+
 def manage_blanks(request, edit=True):
   if request.method == 'POST':
     log('[ upload_blanks POST ]', request.POST)
@@ -263,9 +238,9 @@ def money_table2(req, session, sh, shyear, group, code):
   return render(req, 'money_table2.html', {'album':album})
 
 
-def money_table(request, session, sh, shyear, group, code):
+def money_table(request, session, sh, year, group, code):
 
-  sign = f'{sh}_{year}{group}:{code}'
+  sign = f'{session}__{sh}_{year}{group}:{code}'
   cls = f'{year}{group.upper()}'
 
   try:

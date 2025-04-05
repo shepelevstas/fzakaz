@@ -1,0 +1,458 @@
+{# PREP #}
+<script>
+  const updateTextLayer = (layer, newValue, old) => {
+    const obj = pixi.layers[layer.id]
+    obj.text = newValue.text
+    for (let k in newValue.textStyle) {
+      obj.style[k] = newValue.textStyle[k]
+    }
+    if (obj === pixi.active) {
+      //drawCtrl(obj, true)
+    }
+    // global app(pixi)
+    console.log('[updateTextLayer]', layer, newValue, old)
+    app.render()
+  }
+
+  /*
+  vueff.deleteLayerId = (layId) => {
+    vue.layers.splice(vue.layers.findIndex(l=>l.id===layId), 1)
+  }
+  */
+
+  vue.layers.forEach(layer => {
+    if (layer.type === 'TEXT' && layer.id in pixi.layers) {
+      Vue.watch(layer, (val, old) => {
+        updateTextLayer(layer, val, old)
+      })
+    }
+  })
+</script>
+
+<template id='id_lay_opts_comp'>
+  <div class="d-inline-flex">
+    <span>n</span>
+    <input type="text" v-fullkeyboard :value='lay.obj.name' @input='set_name'>
+  </div>
+
+  <div class="d-inline-flex">
+    <span>x</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.x)' @input='set_x' class="w-9ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>y</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.y)' @input='set_value("y", $event.target.value)'
+      class="w-9ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>w</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.width)' @input='set_width' class="w-9ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>h</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.height)' @input='set_value("height", $event.target.value)'
+      class="w-9ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>ang</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.angle)' @input='set_angle' class="w-7ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>sx</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.scale.x*100)'
+      @input='set_obj_value(lay.obj.scale, "x", $event.target.value/100)' class="w-9ch">
+  </div>
+
+  <div class="d-inline-flex">
+    <span>sy</span>
+    <input type="number" v-fullkeyboard :value='round(lay.obj.scale.y*100)' @input='set_sy' class="w-9ch">
+  </div>
+
+  <template v-if='lay.type==="TEXT"'>
+    <div class="d-inline-flex">
+      <span>text</span>
+      <input v-fullkeyboard type="text" :value='lay.obj.text' @input='on_text_input'>
+
+      <span>color</span>
+      <input v-fullkeyboard type="color" :value='"#"+lay.obj.style.fill.toString(16)' @input='on_text_fill'>
+
+      <span>ff</span>
+      <select @change='set_font' :value='lay.obj.style.fontFamily'>
+        <option v-for='font in fonts' :value='font[0]'>[[ font[0] ]]</option>
+      </select>
+      <button class="btn btn-sm btn-light"><i class="bi bi-plus"></i></button>
+
+      <span>fs</span>
+      <input v-fullkeyboard type="number" :value='lay.obj.style.fontSize' @input='on_text_size' class="w-6ch">
+    </div>
+  </template>
+</template>
+
+<script>
+  const fonts = {{fonts| safe}}
+
+  const LayOpts = {
+    template: '#id_lay_opts_comp',
+    props: ['lay'],
+    data() {
+      return {
+        fonts,
+      }
+    },
+    methods: {
+      round,
+      set_obj_value(obj, key, val) {
+        obj[key] = val
+        drawActiveCtrl()
+        app.render()
+      },
+      set_value(key, value) {
+        this.lay.obj[key] = value
+        drawActiveCtrl()
+        app.render()
+      },
+      set_name(e) {
+        this.lay.name = e.target.value
+        this.lay.obj.name = e.target.value
+      },
+      set_x(e) {
+        this.set_value('x', e.target.value)
+      },
+      set_width(e) {
+        this.set_value('width', e.target.value)
+      },
+      set_angle(e) {
+        this.set_value('angle', e.target.value)
+      },
+      on_scale_x(e) {
+        this.set_obj_value(this.lay.obj.scale, 'x', e.target.value / 100)
+      },
+      set_sy(e) {
+        this.set_obj_value(this.lay.obj.scale, 'y', e.target.value / 100)
+      },
+      on_text_input(e) {
+        this.set_value('text', e.target.value)
+      },
+      on_text_fill(e) {
+        this.set_obj_value(this.lay.obj.style, 'fill', parseInt(e.target.value.slice(1), 16))
+      },
+      on_text_size(e) {
+        this.set_obj_value(this.lay.obj.style, 'fontSize', e.target.value)
+      },
+      set_font(e) {
+        const family = e.target.value
+        const style = 'Regular'
+        pixi.set_text_font(this.lay.id, family, style)
+      },
+    },
+  }
+</script>
+
+
+<template id='laycard-template'>
+  <div @click='selectLayer(lay, $event)' :class='is_selected?"border-primary":""'
+    class="border border-2 user-select-none d-flex align-items-center bg-white">
+
+    <button @click.stop='toggleVisible()' class="btn btn-sm p-0">
+      <i class="bi bi-eye-fill" :class="{[`bi-eye-${lay.visible?'fill':'slash'}`]:true}"></i>
+    </button>
+
+    {% comment %} <span class="dropup dropup-center d-inline-block">
+
+      <button class="btn p-0" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+        <i class="bi bi-three-dots"></i>
+      </button>
+
+      <div class="dropdown-menu p-2 shadow border-1">
+
+        <template v-if="lay.t === 't'">
+          <textarea v-fullkeyboard cols="30" rows="2" v-model='lay.text' class=""></textarea>
+
+          <label>
+            <input v-fullkeyboard type="checkbox" v-model='lay.textStyle.trim'>
+            Trim
+          </label>
+        </template>
+
+        <label>
+          <input type="number" v-model='lay.angle'>
+          Angle
+        </label>
+
+        <div class="accordion">
+
+          <template v-if="lay.t === 't'">
+
+            <div class="accordion-item">
+              <h4 class="accordion-header">
+                <button class="accordion-button p-1 px-2" data-bs-toggle="collapse"
+                  data-bs-target="#font-collapse">Шрифт</button>
+              </h4>
+
+              <div id="font-collapse" class="accordion-collapse collapse show">
+                <div class="accordion-body p-1">
+                  <label class="d-block">
+                    <input v-fullkeyboard style="width:4em;" type="number" v-model='lay.textStyle.fontSize'>
+                    Размер
+                  </label>
+
+                  <label class="d-block">
+                    <input v-fullkeyboard type="color" v-model='lay.textStyle.fill'>
+                    Цвет
+                  </label>
+
+                  <div>
+                    <input id="align-left" type="radio" class="btn-check" name="align" value="left"
+                      v-model='lay.textStyle.align' autocomplete="off">
+                    <input id="align-center" type="radio" class="btn-check" name="align" value="center"
+                      v-model='lay.textStyle.align' autocomplete="off">
+                    <input id="align-right" type="radio" class="btn-check" name="align" value="right"
+                      v-model='lay.textStyle.align' autocomplete="off">
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn p-0"
+                        :class="{[`btn${lay.textStyle.align==='left'?'':'-outline'}-secondary`]:true}"><label
+                          class="p-1 px-2" for='align-left'><i class="bi bi-text-left"></i></label></button>
+
+                      <button class="btn p-0"
+                        :class="{[`btn${lay.textStyle.align==='center'?'':'-outline'}-secondary`]:true}"><label
+                          class="p-1 px-2" for="align-center"><i class="bi bi-text-center"></i></label></button>
+
+                      <button class="btn p-0"
+                        :class="{[`btn${lay.textStyle.align==='right'?'':'-outline'}-secondary`]:true}"><label
+                          class="p-1 px-2" for="align-right"><i class="bi bi-text-right"></i></label></button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <input type="checkbox" id="weight-bold" class="btn-check" autocomplete="off"
+                      v-model='lay.textStyle.fontWeight' value="bold">
+                    <input type="checkbox" id="style-italic" class="btn-check" autocomplete="off"
+                      v-model='lay.textStyle.fontStyle' value="italic">
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn p-0"
+                        :class="{[`btn${lay.textStyle.fontWeight==='bold'?'':'-outline'}-secondary`]:true}"><label
+                          for="weight-bold" class="p-1 px-2"><i class="bi bi-type-bold"></i></label></button>
+
+                      <button class="btn p-0"
+                        :class="{[`btn${lay.textStyle.fontStyle==='italic'?'':'-outline'}-secondary`]:true}"><label
+                          for="style-italic" class="p-1 px-2"><i class="bi bi-type-italic"></i></label></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h4 class="accordion-header">
+                <button class="accordion-button p-1 px-2 collapsed" data-bs-toggle="collapse"
+                  data-bs-target="#font-outline">Обводка</button>
+              </h4>
+
+              <div id="font-outline" class="accordion-collapse collapse">
+                <div class="accordion-body p-1">
+                  <label class="d-block">
+                    <input v-fullkeyboard type="number" style="width:4em;" v-model='lay.textStyle.strokeThickness'>
+                    Толщина
+                  </label>
+
+                  <label class="d-block">
+                    <input v-fullkeyboard type="color" v-model='lay.textStyle.stroke'>
+                    Цвет
+                  </label>
+                </div>
+              </div>
+            </div>
+
+          </template>
+
+        </div>
+
+      </div>
+
+    </span> {% endcomment %}
+
+    <button v-if='lay.mask' class="btn btn-sm p-0"><i class="bi bi-transparency"></i></button>
+
+    <button v-if="lay.mask" class="btn btn-sm p-0"><i class="bi bi-arrow-90deg-down"></i></button>
+
+    <span class="overflow-hidden">[[ lay.name ]]</span>
+
+    <div v-if='lay.type==="TEXT"' class="ms-auto">
+      <button class="btn btn-sm p-0"><i class="bi bi-fonts"></i></button>
+    </div>
+
+  </div>
+</template>
+
+<script>
+  const LayCard = {
+    template: '#laycard-template',
+    props: ['lay'],
+    setup(props) {
+      const is_selected = Vue.computed(() => {
+        return vue.selected2.has(props.lay)
+      })
+
+      const toggleVisible = (value) => {
+        props.lay.visible = value == undefined ? !props.lay.visible : value
+        props.lay.obj.visible = props.lay.visible
+        app.render()
+      }
+
+      return {
+        selectLayer(lay, event) {
+          vue.select_layer(lay.id)
+          pixi.select_layer(lay.id)
+        },
+        is_selected,
+        toggleVisible,
+      }
+    },
+  }
+</script>
+
+
+<template id='id_draggable_template'>
+  <div draggable="true" @dragstart='start' @dragend='end' class="bg-primary position-relative" :class='{"pt-2":over}'>
+    <div v-if='dragging' class="position-absolute start-0 top-0 bottom-0 end-0" @dragenter.prevent='enter'
+      @dragover.prevent @dragleave.prevent='leave' @drop.prevent='drop'></div>
+    <slot></slot>
+  </div>
+</template>
+
+<script>
+  const dragging = Vue.ref(false)
+  const Draggable = {
+    template: '#id_draggable_template',
+    data() {
+      return {
+        over: false,
+        dragged: false,
+        dragging,
+      }
+    },
+    emits: ['dragged', 'dropped'],
+    methods: {
+      start(e) {
+        e.dataTransfer.dropEffect = 'move'
+        this.dragged = true
+        this.dragging = true
+        this.$emit('dragged')
+      },
+      end(e) {
+        this.dragged = false
+        this.dragging = false
+      },
+      drop(e) {
+        this.over = false
+        this.$emit('dropped')
+      },
+      enter(e) {
+        this.over = true
+      },
+      leave(e) {
+        this.over = false
+      },
+    }
+  }
+</script>
+
+
+<template id='vueapp-template'>
+  <div class='bg-white shadow'>
+    <Draggable v-for='lay in layers' :key='lay.id' @dragged='set_dragged(lay)' @dropped='on_drop(lay)'>
+      <lay-card :lay='lay'></lay-card>
+    </Draggable>
+
+    <div class="mt-auto">
+      <button @click='save_document' class="btn btn-sm btn-outline-success">
+        save
+      </button>
+    </div>
+  </div>
+
+  <Teleport to="#bottom_panel">
+    <template v-if='mode==="T"'>
+      <input type="color" v-model='last_color' ref="color">
+    </template>
+
+    <lay-opts v-else-if='active' :lay='active'></lay-opts>
+
+    <div>
+      <kbd v-for='k in keys_seq' class="ms-1">[[ k ]]</kbd>
+    </div>
+  </Teleport>
+</template>
+
+<script>
+  const vueapp = Vue.createApp({
+    template: '#vueapp-template',
+    components: {LayCard, LayOpts, Draggable},
+    setup() {
+      let dragged = null
+      return {
+        layers: Vue.computed(() => vue.layers.filter(i => i.type !== 'PAGE')),
+        selected2: vue.selected2,
+        active: vue.active,
+        mode: vue.mode,
+        keys_seq: Vue.reactive([]),
+        last_color: vue.last_color,
+        save_document() {
+          fetch('{% url "save_document" %}', {
+            method: 'POST',
+            body: JSON.stringify(get_document()),
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}',
+            },
+          }).then(res => res.json()).then(data => {
+            console.log('[save res]', data)
+          })
+        },
+        set_dragged(lay) {dragged = lay},
+        on_drop(lay) {
+          if (!dragged) {return }
+          if (dragged == lay) {return }
+          const fromIndex = vue.layers.findIndex(i => i == dragged)
+          const trgIndex = vue.layers.findIndex(i => i == lay)
+          if (fromIndex + 1 === trgIndex) {return }
+          console.log('[moving]')
+          vue.layers.splice(fromIndex, 1)
+          const toIndex = vue.layers.findIndex(i => i == lay)
+          vue.layers.splice(toIndex, 0, dragged)
+          pixi.drop_lay(dragged.id, lay.id)
+        },
+      }
+    },
+    mounted() {
+      window.addEventListener("keydown", (e) => {
+        if (this.keys_seq.length > 9)
+          this.keys_seq.pop()
+        this.keys_seq.unshift(e.code)
+      })
+    },
+  })
+
+  vueapp.config.compilerOptions.delimiters = ['[[', ']]']
+    ; (() => {
+      const onInputFocus = () => {toggleKeys(false)}
+      const onInputBlur = () => {toggleKeys(true)}
+      vueapp.directive('fullkeyboard', {
+        mounted(el) {
+          el.addEventListener('focus', onInputFocus)
+          el.addEventListener('blur', onInputBlur)
+        },
+        beforeUnmount(el) {
+          onInputBlur()
+          el.removeEventListener('focus', onInputFocus)
+          el.removeEventListener('blur', onInputBlur)
+        },
+      })
+    })()
+
+  onLoad(() => {window.vm = vueapp.mount('#vue-app')})
+</script>

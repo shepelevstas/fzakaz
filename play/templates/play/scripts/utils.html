@@ -1,0 +1,46 @@
+<script>
+  const on = (obj, event, f) => {
+    obj.addEventListener(event, f)
+  }
+  const onLoad = (f) => {
+    on(document, 'DOMContentLoaded', f)
+  }
+  const deg2rad = Math.PI/180
+  const rot_x = (x, a) => {
+    a = a * deg2rad
+    return [Math.cos(a)*x, Math.sin(a)*x]
+  }
+  const scalar = (a,b) => a.x * b.x + a.y * b.y
+  const radBetween = (a,b) => Math.acos(scalar(a,b) / (Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y)))
+  const angleBetween = (a,b) => radBetween(a,b) / deg2rad
+  const proj = (v, u) => {
+    // u - unit vector ||u|| = 1
+    const scal = v.x * u.x + v.y * u.y
+    const vlen = Math.hypot(v.x, v.y)
+    const s = Math.cos(Math.acos(scal / vlen)) * vlen
+
+    return {x: u.x * s, y: u.y * s, length: s}
+  }
+  const rotate_point = (v, a) => {
+    const cos = Math.cos(a)
+    const sin = Math.sin(a)
+
+  }
+  const mm2px = 300 / 25.4
+  const diag_scale_M = (ang) => {
+    const rad = ang * Math.PI / 180
+    const c = Math.cos(rad)
+    const s = Math.sin(rad)
+    const cc = c*c
+    const ss = s*s
+    const sc = s*c
+    return (sx) => {
+      const sc_sx_1 = sc*(sx-1)
+      //          a        b        c         d
+      return [cc*sx+ss, sc_sx_1, sc_sx_1, ss*sx+cc]
+    }
+  }
+  const round = (value, precision=10) => {
+    return Math.round(value*precision)/precision
+  }
+</script>

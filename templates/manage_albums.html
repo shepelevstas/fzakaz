@@ -70,7 +70,7 @@
     <tbody id="album_items">
 
       {% for album in albums %}
-        <tr data-album="{{album.id}}" class="align-middle {% if album.is_deleted %}text-decoration-line-through{% endif %}">
+        <tr data-album="{{album}}" class="align-middle {% if album.deleted %}text-decoration-line-through{% endif %}">
 
           {# SESSION #}
           <td class="ps-2 ps-lg-4">
@@ -101,7 +101,7 @@
               <i class="bi bi-table"></i>
             </a>
 
-            {% if album.is_closed %}
+            {% if album.closed %}
               <a href="{% url 'excel_file' album.sign %}" title="Скачать таблицу заказов в Excel">
                 <i class="bi bi-file-earmark-excel-fill"></i>
               </a>
@@ -116,9 +116,9 @@
 
           {# PROGRESS #}
           <td class="text-center">
-            <span class="item_count {% if album.is_closed %}text-muted{% endif %}">{{album.ordered_count}} / {{album.blanks_count}}</span>
+            <span class="item_count {% if album.closed %}text-muted{% endif %}">{{album.ordered_count}} / {{album.blanks_count}}</span>
             <div class="progress rounded-pill" style="height:10px;">
-              <div class="progress-bar item_progress rounded-end {% if album.is_closed %}bg-opacity-50{% endif %} {% if album.order_progress < 50 %}bg-warning{% elif album.order_progress < 100 %}bg-success{% else %}bg-primary{% endif %}" style="width: {{album.order_progress|unlocalize}}%;"></div>
+              <div class="progress-bar item_progress rounded-end {% if album.closed %}bg-opacity-50{% endif %} {% if album.order_progress < 50 %}bg-warning{% elif album.order_progress < 100 %}bg-success{% else %}bg-primary{% endif %}" style="width: {{album.order_progress|unlocalize}}%;"></div>
             </div>
             {% if album.last_order_time and 'last_time' in request.GET %}
               <small title="Последний заказ" class="text-black-50">{{album.last_order_time|date:'Y-b-d'}}</small>
@@ -132,7 +132,7 @@
               <input type="hidden" name="album_sign" value="{{album.sign}}"/>
 
               {% if edit %}
-                {% if album.is_deleted %}
+                {% if album.deleted %}
                   <button class="btn btn-outline-success btn-sm" type="submit" name="action" value="undelete" title="Восстановить">
                     <i class="bi bi-recycle"></i>
                   </button>
@@ -143,7 +143,7 @@
                 {% endif %}
               {% endif %}
 
-              {% if album.is_closed %}
+              {% if album.closed %}
                 <button class="btn btn-sm btn-outline-success" type="submit" name="action" value="unclose" title="Открыть">
                   <i class="bi bi-unlock-fill"></i>
                 </button>

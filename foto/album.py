@@ -1,4 +1,5 @@
 import shutil
+from pathlib import Path
 from functools import lru_cache
 from copy import deepcopy
 from datetime import datetime
@@ -118,7 +119,7 @@ PRICELISTS = {
         "pill":   {"title": "Подушка",          "price": 850, "q":0},
         "mug":    {"title": "Кружка",           "price": 600, "q":0},
         "tshirt": {"title": "Футболка",         "price": 950, "q":0},
-        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,   "q":0},
       },
       "style": "aspect-ratio:726/527;background-position:6.3% 3.2%;background-size:166%;transform:rotate(90deg);margin:13.7% 0;border-radius:0;",
     },
@@ -136,7 +137,7 @@ PRICELISTS = {
         "pill":   {"title": "Подушка",          "price": 850, "q":0},
         "mug":    {"title": "Кружка",           "price": 600, "q":0},
         "tshirt": {"title": "Футболка",         "price": 950, "q":0},
-        "tsize":   {"title": "Обхват груди", "price": 0,   "q":0},
+        "tsize":  {"title": "Обхват груди",     "price": 0,   "q":0},
       },
       "style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 48.5%;",
     },
@@ -268,13 +269,77 @@ PRICELISTS = {
         "blank_img_style": "aspect-ratio:8/12;background-size:201%;",
         'formats': ['*'],
       },
-      '23feb': {'ru': '23 Февраля', "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;"},
-      '9may': {'ru': '9 Мая', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
-      'pozdr': {'ru': 'Поздравляю!', 'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;'},
+      '23feb': {
+        'ru': '23 Февраля',
+        "blank_img_style": "aspect-ratio:8/12;background-size:200%;background-position:100% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;",
+      },
+      '9may': {
+        'ru': '9 Мая',
+        'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:0% 100%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;',
+      },
+      'pozdr': {
+        'ru': 'Поздравляю!',
+        'blank_img_style': 'aspect-ratio:8/12;background-size:200%;background-position:100% 0%;transform: rotate(-90deg) scale(.6666);margin: -43% 0;',
+      },
     },
     'bonus': {
       "text": "При заказе от %(sum)s₽ - все четыре электронные фото - в подарок!",
       "success": "Все четыре электронные фото - в подарок!",
+      "sum": 2000,
+    },
+    'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
+  },
+  'price_2025_vipusk': {
+    'version': 'vesna25',
+    'ru': 'Весна 2025',
+    'en': '2025_vesna',
+    'formats': {
+      'f10':    {'ru': 'Фото 10х15',   'price': 400,  'en': '10x15'},
+      "f15":    {"ru": "Фото 15х23",   "price": 450,  'en': '15x23'},
+      "f20":    {"ru": "Фото 20х30",   "price": 500,  'en': '20x30'},
+      "f30":    {"ru": "Фото 30х42",   "price": 600,  'en': '30x42'},
+      "m10":    {"ru": "Магнит 10х15", "price": 500,  'en': 'm10x15'},
+      "m15":    {"ru": "Магнит 15х23", "price": 600,  'en': 'm15x23'},
+      "pill":   {"ru": "Подушка",      "price": 1200, 'en': 'podushka'},
+      "mug":    {"ru": "Кружка",       "price": 800,  'en': 'krujka'},
+      "tshirt": {"ru": "Футболка",     "price": 1200, 'en': 'futbolka'},
+      "tsize":  {"ru": "Обхват груди", "price": 0,    'en': 'razmer'},
+      "book":  {"ru": "Фотокнига (обложка - коллаж, разворот - виньетка)", "price": 1500,    'en': 'kniga'},
+      "set":  {"ru": "Выгодный комплект (портрет, коллаж и виньетка 20х30)", "price": 1200,    'en': 'komplekt'},
+    },
+    'themes': {
+      'port': {
+        'ru': 'Портрет',
+        "blank_img_style": "aspect-ratio:726/527;background-position:6.3% 3.2%;background-size:166%;transform:rotate(90deg);margin:13.7% 0;border-radius:0;",
+        'formats': [
+          "f10", "f15", "f20", "f30", "m10", "m15", "pill", "mug", "tshirt", "tsize"
+        ],
+      },
+      'vint': {
+        'ru': 'Виньетка',
+        "blank_img_style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 48.5%;",
+        'formats':[
+          "f15", "f20", "f30", "m10", "m15", "pill", "mug", "tshirt", "tsize"
+        ],
+      },
+      'coll': {
+        'ru': 'Коллаж',
+        'blank_img_style': 'aspect-ratio:726/527;background-size:166%;background-position:6.3% 94%;',
+        'formats':[
+          "f15", "f20", "f30", "m10", "m15", "pill", "mug", "tshirt", "tsize"
+        ],
+      },
+      'all': {
+        'ru': 'Все фото',
+        'blank_img_style': 'aspect-ratio:1205/1795;background-size:100%;background-position:center;',
+        'formats':[
+          "book", "set"
+        ],
+      },
+    },
+    'bonus': {
+      "text": "При заказе от %(sum)s₽ - электронный портрет в подарок!",
+      "success": "Электронный портрет в подарок!!",
       "sum": 2000,
     },
     'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
@@ -298,7 +363,7 @@ class PriceList:
     if self.data.get('version'):
       return self.data['version']
 
-    theme1 = next(self.data.values())
+    theme1 = next((v for k,v in self.data.items() if k not in ('bonus', 'BONUS')), None) or {}
 
     if 'amounts' in theme1:
       if 'style' in theme1:
@@ -323,6 +388,17 @@ class PriceList:
 
     return ""
 
+  def get_bonus(self):
+    """
+      -> {'text', 'success', 'sum'}
+    """
+    if self.ver == 'vesna25':
+      bonus = self.data['bonus']
+      bonus['text'] = bonus['text'] % bonus
+      return bonus
+
+    return self.data['BONUS']
+
   def get_bonus_text(self):
     if self.ver == 'vesna25':
       return self.data['bonus']['text'] % self.data['bonus']
@@ -338,6 +414,9 @@ class PriceList:
       return self.data['BONUS']['success'] % self.data['BONUS']
 
   def get_formats(self, copy=False):
+    """
+      -> {<format_k>:{'ru','en','price':<int>}}
+    """
     if self.ver == 'vesna25':
       if copy:
         return deepcopy(self.data['formats'])
@@ -359,7 +438,12 @@ class PriceList:
             continue
       return formats
 
+    return {}
+
   def get_themes(self):
+    """
+      -> {<theme_k>:{'ru':<str>, 'formats':[<str>], 'blank_img_style':<str>}}
+    """
     if self.ver == 'vesna25':
       for k,v in self.data['themes'].items():
         if 'formats' not in v or v['formats'] == ['*']:
@@ -373,6 +457,9 @@ class PriceList:
         if k != 'BONUS'
       }
 
+    return {}
+
+  @lru_cache
   def get_empty_copy(self):
     return deepcopy({
       'themes': self.get_themes(),
@@ -380,6 +467,7 @@ class PriceList:
       'cols': {},
       'rows': {},
       'total': 0,
+      'bonus': self.get_bonus(),
     })
 
   def load_orders(self, orders):
@@ -430,6 +518,7 @@ class PriceList:
       'cols': cols,
       'rows': rows,
       'total': total,
+      'bonus': self.get_bonus(),
     }
 
 
@@ -453,6 +542,7 @@ class Album:
     self.order_format = 'json'
     self.orders_dir = settings.MEDIA_ROOT / 'orders'
     self.after = after
+    self.post_data = None
 
   def __str__(self):
     return f'Album(<{self.session}__{self.sh}_{self.shyear}{self.group}>)'
@@ -462,8 +552,8 @@ class Album:
     ses__sh_yrgr = None
     try:
       ses__sh_yrgr = signer.unsign(sign)
-    except:
-      log(f'[Album.from_sign FAIL]\n{sign=}')
+    except Exception as err:
+      log(f'[Album.from_sign FAIL]\n{sign=}\n[ERR] {err=}')
       return
     ses, sh_yrgr = ses__sh_yrgr.split('__', 1)
     sh, yrgr = sh_yrgr.split('_', 1)
@@ -488,15 +578,30 @@ class Album:
     if file.is_file():
       return file.unlink()
 
+  def get_closed_file(self):
+    return self.blanks_cls / 'closed'
+
   @property
   @lru_cache
   def is_closed(self):
-    return (self.blanks_cls / 'closed').is_file() or self.is_deleted
+    return self.get_closed_file().is_file() or self.is_deleted
+
+  def get_deleted_file(self):
+    return self.blanks_cls / 'deleted'
 
   @property
   @lru_cache
   def is_deleted(self):
-    return (self.blanks_cls / 'deleted').is_file()
+    return self.get_deleted_file().is_file()
+
+  @lru_cache
+  def is_ordered(self):
+    order_file = self.get_order_file()
+    if not order_file:
+      return False
+    if not order_file.is_file():
+      return False
+    return not self.is_deleted
 
   @property
   def blanks(self):
@@ -514,6 +619,27 @@ class Album:
       'style': style,
     } for i in self.blanks_dir.iterdir() if i.is_dir()]
 
+  def get_names_file(self):
+    return self.blanks_dir / 'names.csv'
+
+  def suggest_name(self):
+    '''
+      suggest name for vint
+    '''
+    if not self.uuid:
+      return ''
+    names = self.get_names_file()
+    if not names.is_file():
+      return ''
+    names = dict([[ v.rstrip('.jpg') for v in line.split(';')[:2]] for line in names.read_text().split('\n') if line.strip()])
+    print(f'[NAMES] {names=}')
+    return names.get(self.get_imgname(), '')
+
+  def file_mtime_as_datetime(self, file):
+    if not isinstance(file, Path):
+      file = Path(file)
+    return datetime.fromtimestamp(file.stat().st_mtime).astimezone(zone)
+
   @property
   @lru_cache
   def last_order_time(self):
@@ -527,7 +653,8 @@ class Album:
       if date:
         date = datetime.fromisoformat(date)
       else:
-        date = datetime.fromtimestamp(json.stat().st_mtime).astimezone(zone)
+        # date = datetime.fromtimestamp(json.stat().st_mtime).astimezone(zone)
+        date = self.file_mtime_as_datetime(json)
       res = date if res is None else max(res, date)
     return res
 
@@ -618,20 +745,26 @@ class Album:
 
   @lru_cache
   def get_pricename(self, uuid=None):
-    for lvl, i in [
+    for lvl, d in [
       ('cls', self.blanks_cls),
       ('sh', self.blanks_sh),
       ('ses', self.blanks_ses),
       ('top', self.blanks_top),
     ]:
-      f = i / 'price'
+      f = d / 'price'
       if f.is_file():
         return f.read_text().strip()
+
+    test_name = f'price_{self.session}'
+
+    if test_name in PRICELISTS:
+      return test_name
 
     return 'default'
 
   # TODO
   def get_pricefile(self, uuid=None):
+    raise NotImplementedError()
     trg = None
     if uuid:
       trg = self.blanks_dir / str(uuid) / 'price.json'
@@ -648,7 +781,15 @@ class Album:
     uuid = uuid or self.uuid
     # assert uuid, 'no uuid in album.get_empty_goods'
     pricename = self.get_pricename(uuid)
-    return deepcopy(PRICELISTS.get(pricename))
+    if pricename not in PRICELISTS:
+      pricename = 'default'
+    return deepcopy(PRICELISTS[pricename])
+
+  @lru_cache
+  def get_order_or_post_data(self):
+    if self.post_data:
+      return self.post_data
+    return self.get_order()
 
   @lru_cache
   def get_goods(self, uuid=None, post_data=None):
@@ -664,15 +805,21 @@ class Album:
           item["q"] = data.get(f'{good_name}_{name}', 0)
 
     if post_data:
+      data = dict(post_data)
       for good_name, part in goods.items():
         if good_name == 'BONUS': continue
         for line_name, item in part['amounts'].items():
-          k = f'{good_name}_{line_name}'
-          v = next((j for i,j in post_data if i == k), None)
-          if v is not None:
-            item['q'] = v
+          # k = f'{good_name}_{line_name}'
+          # q = next((q for i,q in post_data if i == k), None)
+          q = data.get(f'{good_name}_{line_name}')
+          if q is not None:
+            item['q'] = q
 
     return goods
+
+  @lru_cache
+  def get_pricelist(self):
+    return PriceList.from_name(self.get_pricename())
 
   def get_blank_url(self, uuid=None):
     uuid = uuid or self.uuid
@@ -724,10 +871,18 @@ class Album:
 
   @property
   def id(self):
+    '''
+      <session> ie 2025_vesna
+      <name> ie 18_1a
+      <name> = <sh>_<shyear><group>
+    '''
     return f'{self.session}__{self.name}'
 
   @property
   def sign(self):
+    '''
+      <id> = <session>__<sh>_<shyear><group>
+    '''
     return signer.sign(self.id)
 
   def get_json(self):
@@ -751,7 +906,8 @@ class Album:
 
   @property
   def money_table_url(self):
-    sign = signer.sign(self.id)
+    # sign = signer.sign(self.id)
+    sign = self.sign
     adr, code = sign.split(':')
     return f'{code}/{adr}/money_table/'
 

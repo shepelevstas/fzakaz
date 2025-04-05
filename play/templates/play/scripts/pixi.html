@@ -1,0 +1,1067 @@
+<script>
+  // KEYS
+  const keys = {
+    Space: keyboard('Space'),
+    Delete: keyboard('Delete'),
+    ShiftLeft: keyboard('ShiftLeft'),
+    ShiftRight: keyboard('ShiftRight'),
+    KeyT: keyboard('KeyT'),
+    Esc: keyboard('Escape'),
+  }
+
+  const toggleKeys = value => {
+    const method = ({false: 'unsubscribe', true: 'subscribe'})[value]
+    for (let k of Object.values(keys)) {
+      k[method]()
+    }
+  }
+
+  const loader = PIXI.Assets.loader
+  const app = new PIXI.Application()
+
+  let last_id = 0
+  const pixi = {
+    layers: {},
+
+    active: null,
+
+    selected: new Set(),
+
+    drop_lay(drop_lay_id, trg_lay_id) {
+      const trg_lay = pixi.layers[trg_lay_id]
+      const trg_index = trg_lay.parent.getChildIndex(trg_lay)
+      const dropped_lay = pixi.layers[drop_lay_id]
+      const src_index = dropped_lay.parent.getChildIndex(dropped_lay)
+      dropped_lay.parent.setChildIndex(dropped_lay, trg_index + (src_index > trg_index))
+      app.render()
+    },
+
+    select_layer(id) {
+      const shift = keys.ShiftLeft.isDown || keys.ShiftRight.isDown
+
+      if (!shift) {pixi.selected.clear()}
+      if (!pixi.layers[id]) {return }
+
+      pixi.selected.add(pixi.layers[id])
+      pixi.active = pixi.layers[id]
+      //console.log('[pixi.active]', pixi.active)
+
+      if (pixi.selected.size > 1) {
+        drawSelectedCtrl()
+      } else {
+        drawActiveCtrl()
+      }
+    },
+
+    set_text_font(id, family, style = 'Regular') {
+      const lay = pixi.layers[id]
+      return loader.load({
+        loadParser: 'loadWebFont',
+        data: {family},
+        alias: `${family}-${style}`,
+        src: `/play/api/get_font/${family}/${style}/`,
+      }).then(font => {
+        lay.style.fontFamily = family
+        drawActiveCtrl()
+        //app.render()
+      })
+    },
+  }
+
+  const vue = {
+    layers: Vue.reactive([]),
+
+    add_layer(list, obj) {
+      const layer = {
+        id: ++last_id,
+        type: list[0],
+        name: obj.name,
+        visible: obj.visible,
+        data: list,
+        //obj,
+      }
+      obj.id = layer.id
+      //pixi.layers[layer.id] = obj
+      vue.layers.unshift(layer)
+      return vue.layers[0]
+    },
+
+    selected2: Vue.reactive(new Set()),
+
+    active: Vue.computed(() => {
+      if (vue.selected2.size === 1)
+        return vue.selected2.values().next().value
+    }),
+
+    select_layer(id) {
+      const shift = keys.ShiftLeft.isDown || keys.ShiftRight.isDown
+
+      if (!shift) {vue.selected2.clear()}
+      if (!id) {return }
+      const lay = vue.layers.find(l => l.id === id)
+      if (!lay) {return }
+
+      vue.selected2.add(lay)
+    },
+
+    delete_layer(id) {
+      vue.layers.splice(vue.layers.findIndex(l => l.id === id), 1)
+    },
+
+    mode: Vue.ref('N'),
+
+    last_color: Vue.ref(''),
+
+    //fonts: Vue.reactive([]),
+
+    selected_font: Vue.ref('Lobster'),
+  }
+
+  /*
+      {id:5, n:'SH', t:'t', x:4295.698914299524, y:262.65131774668953, text:'Школа № 18', v:true, textStyle: {
+        // Font
+        fontFamily: 'Monotype Corsiva',  // default: Arial
+        fontSize: 225,
+        fontStyle: "normal",
+        fontWeight: "bold",
+
+        // Fill
+        fill: "#600005",
+
+        // Multiline
+        align: "left",
+        lineHeight: 60,
+        whiteSpace: "normal",
+        //wordWrap: true,
+        //wordWrapWidth: 440,
+
+        // Stroke
+        stroke: "#bbbd51",
+        strokeThickness: 0,
+        lineJoin: "round",
+        miterLimit: 2,
+
+        // Shadow
+        dropShadowColor: '#000000',
+        dropShadow: true,
+        dropShadowAngle: Math.PI / 2,  // 90 deg down
+        dropShadowAlpha: 0.7,
+        dropShadowBlur: 10,
+        dropShadowDistance: 5,
+
+        // Layout
+        letterSpacing: 0,
+        textBaseline: "bottom",
+
+        // Texture
+        padding: 50,
+        trim: true,
+      }},
+
+      {id:11, n:'B_deco', t:'s', s:1, v:true, x:1522.7106196508719, y:1026.1999724383018, src:'/media/ports/coll_b_deco.png'},
+  */
+
+  /*
+  const data_to_vuelay = (list) => {
+    return {
+      id: ++last_id,
+      t: list[0],
+      n: list[1],
+      v: true,
+      x: list[2][0] + (list[2][2]||0)/2,
+      y: list[2][1] + (list[2][3]||0)/2,
+      s: 1,
+      src: '/media/' + list[3].src,
+      data: list,
+    }
+  }
+  */
+
+  const ui_lays = [
+    'CONT', 'origin', [0, 0], {}, [
+      ['CONT', 'scaled', [0, 0], {}, []],
+      ['CONT', 'overlay', [0, 0], {}, [
+        ['GUIDE', 'x', ['HOR', 100]],
+        ['GUIDE', 'x2', ['HOR', 2900]],
+        ['GUIDE', 'y', ['VERT', 200]],
+        ['GUIDE', 'y2', ['VERT', 4800]],
+      ]],
+      ['CONT', 'ctrl', [0, 0], {}, [
+        ['CONT', 'ctrl_pos', [0, 0], {visible: false}, []],
+      ]],
+      ['CONT', 'hit', [0, 0], {visible: false}, []],
+    ],
+  ]
+
+  // 450mm x 305mm @ 300dpi == 5315 x 3602
+  // 16777215 == 0xffffff
+  const vnt = [
+    'PAGE', 'vnt', [5000, 3000], {bg: 16777215}, [
+      ['IMG', 'blank', [1000, 1000, 500, 500], {src: '18_1В_SKY_0099.jpg'}],
+      ['IMG', 'stalin', [200, 100, 500, 500, 0], {src: 'stalin.jpg'}],
+      ['TRG', 'TRG', [2000, 1000, 1000, 1000]],
+    ]
+  ]
+
+  const doc_raw = {{document| safe }}
+
+  const vesna_blank = [
+    'PAGE', 'vesna_blank', [666, 1000], {bg: 16777215, mode: 'RGB'}, [
+      ['TRG', '1', [0, 0, 333, 500]],
+      ['TRG', '2', [333, 0, 333, 500]],
+      ['TRG', '3', [0, 500, 333, 500]],
+      ['TRG', '4', [333, 500, 333, 500]],
+    ]
+  ]
+
+
+
+
+  //const vueff = {}
+  let hitff = null
+  //const selected = new Set()
+  //let active = null
+  const ui = {}
+  const guides = {}
+  const doc = {}
+  const ctrls = {
+    c: new PIXI.Graphics(),
+    l: new PIXI.Graphics(),
+    r: new PIXI.Graphics(),
+    t: new PIXI.Graphics(),
+    b: new PIXI.Graphics(),
+    tr: new PIXI.Graphics(),
+    br: new PIXI.Graphics(),
+  }
+  //const lays = {}
+  let mmf = null
+  let mmef = null
+
+
+  /*
+  const select_layers = (...layIds) => {
+    const shift = keys.ShiftLeft.isDown || keys.ShiftRight.isDown
+    if (!shift) {selected.clear()}
+    for (let layId of layIds) {
+      let lay = pixi.layers[layId]
+      if (!lay) {continue}
+      selected.add(lay)
+      active = lay
+    }
+    if (selected.size > 1) {
+      drawSelectedCtrl()
+    } else {
+      drawActiveCtrl()
+    }
+  }*/
+
+  const layer_click = e => {
+    if (keys.Space.isDown) {
+      start_drag_page(e)
+      return
+    }
+
+    //console.log('[e.target.id]', e.target.id)
+    pixi.select_layer(e.target.id)
+
+    //const shift = keys.ShiftLeft.isDown || keys.ShiftRight.isDown
+
+    //if (!shift) {selected.clear()}
+
+    //pixi.active = e.target
+    //selected.add(pixi.active)
+    //vueff.selectLayerId(active.id)
+
+    vue.select_layer(pixi.active.id)
+
+    /*
+    if (selected.size > 1) {
+      drawSelectedCtrl()
+    } else {
+      drawActiveCtrl()
+    }
+    */
+
+    ctrl_pos_on_mousedown(e)
+  }
+
+  const start_drag_page = e => {
+    const p = ui.origin.position.subtract(e.global)
+    mmf = mm => {
+      mm.global.add(p, ui.origin.position)
+      update_axis()
+    }
+  }
+
+  const update_axis = () => {
+    // to not offscreen: keep line center at stage/screen
+    const x = app.screen.width / 2 - ui.origin.x
+    const y = app.screen.height / 2 - ui.origin.y
+
+    // update values to scale
+    Object.values(guides).forEach(g => {
+      if (g.value.direction === "HOR") {
+        g.x = x
+        g.y = g.value.value * ui.scaled.scale.x
+      } else {
+        g.y = y
+        g.x = g.value.value * ui.scaled.scale.x
+      }
+    })
+  }
+
+  const drawSelectedCtrl = () => {
+    let ll = Infinity
+    let rr = -Infinity
+    let tt = Infinity
+    let bb = -Infinity
+
+    for (let i of pixi.selected) {
+      let bounds = i.getBounds()
+      ll = Math.min(ll, bounds.x)
+      rr = Math.max(rr, bounds.x + bounds.width)
+      tt = Math.min(tt, bounds.y)
+      bb = Math.max(bb, bounds.y + bounds.height)
+    }
+
+    const ww = rr - ll
+    const hh = bb - tt
+    const w2 = ww / 2
+    const h2 = hh / 2
+
+    ui.ctrl_pos.position.set((ll + rr) / 2 - ui.origin.x, (tt + bb) / 2 - ui.origin.y)
+    ui.ctrl_pos.angle = 0
+    ctrls.r.x = ctrls.tr.x = ctrls.br.x = w2 + 1
+    ctrls.l.x = -ctrls.r.x
+    ctrls.b.y = ctrls.br.y = h2 + 1
+    ctrls.t.y = ctrls.tr.y = -ctrls.b.y
+    ctrls.t.width = ctrls.b.width = ww + 4
+    ctrls.l.height = ctrls.r.height = hh + 4
+    ctrls.c.hitArea = new PIXI.Rectangle(-w2, -h2, ww, hh)
+    ui.ctrl_pos.visible = true
+    app.render()
+  }
+
+  const drawActiveCtrl = () => {
+    //console.log('[drawActiveCtrl pixi.active]', pixi.active)
+    const active = pixi.active
+    const bounds = active.getLocalBounds()
+
+    const [sx, sy] = calcScale(active)
+    const ww = bounds.width * sx * active.scale.x
+    const hh = bounds.height * sy * active.scale.y
+    const w2 = ww / 2
+    const h2 = hh / 2
+
+    ui.ctrl_pos.parent.toLocal(active.getGlobalPosition(), null, ui.ctrl_pos.position)
+    ui.ctrl_pos.angle = active.angle
+    ctrls.l.height = ctrls.r.height = hh + 4
+    ctrls.t.width = ctrls.b.width = ww + 4
+    ctrls.r.x = ctrls.tr.x = ctrls.br.x = w2 + 1
+    ctrls.b.y = ctrls.br.y = h2 + 1
+    ctrls.t.y = ctrls.tr.y = -ctrls.b.y
+    ctrls.l.x = -ctrls.r.x
+    ctrls.c.hitArea = new PIXI.Rectangle(-w2, -h2, ww, hh)
+    ui.ctrl_pos.visible = true
+    app.render()
+  }
+
+  const calcScale = active => {
+    let parent = active.parent
+    let sx = parent.scale.x
+    let sy = parent.scale.y
+    while (parent.name !== 'origin') {
+      sx *= parent.scale.x
+      sy *= parent.scale.y
+      parent = parent.parent
+    }
+    return [sx, sy]
+  }
+
+  const ctrl_pos_on_mousedown = e => {
+    console.log('ctrl_pos_on_mousedown')
+    if (keys.Space.isDown) {
+      console.log('Space.isDown')
+      start_drag_page(e)
+    } else if (pixi.selected.size > 1) {
+      console.log('selected.size > 1')
+      ctrl_pos_on_mousedown_selected(e)
+    } else {
+      console.log('else')
+      ctrl_pos_on_mousedown_active(e)
+    }
+  }
+
+  const ctrl_pos_on_mousedown_selected = e => {
+    console.log('ctrl_pos_on_mousedown_selected')
+    e.stopPropagation()
+    const ll = {}
+    for (let l of pixi.selected) {
+      ll[l.id] = l.getGlobalPosition().subtract(e.global)
+    }
+    const p = ui.ctrl_pos.getGlobalPosition().subtract(e.global)
+    mmf = mm => {
+      for (let l of pixi.selected) {
+        let g = mm.global.add(ll[l.id])
+        l.parent.toLocal(g, null, l.position)
+      }
+      ui.ctrl_pos.parent.toLocal(mm.global.add(p), null, ui.ctrl_pos.position)
+    }
+  }
+
+  const ctrl_pos_on_mousedown_active = e => {
+    console.log('ctrl_pos_on_mousedown_active')
+    e.stopPropagation()
+    const p = pixi.active.getGlobalPosition().subtract(e.global)
+
+    mmf = mm => {
+      const g = mm.global.add(p)
+      pixi.active.parent.toLocal(g, null, pixi.active.position)
+      ui.ctrl_pos.parent.toLocal(g, null, ui.ctrl_pos.position)
+    }
+  }
+
+  const drawFuncs = {
+    CONT(list, dict) {
+      const [type, name, pos, opts, children] = list
+      const o = new PIXI.Container()
+      o.x = pos[0] || 0
+      o.y = pos[1] || 0
+      o.name = name
+      o.visible = opts.visible === false ? false : true
+      if (dict) {dict[name] = o}
+      if (dict == doc && type === 'CONT')
+        vue.add_layer(list, o)
+      drawDoc(o, children, dict)
+      return o
+    },
+    PAGE(list, dict) {
+      const [type, name, size, opts, children] = list
+      const o = drawFuncs.CONT(['PAGE', 'page', [0, 0], {}, []], dict)
+
+      const mask = new PIXI.Graphics()
+      mask.name = 'mask'
+      o.addChild(mask)
+      mask.rect(0, 0, size[0], size[1]).fill(0xff0000)
+      o.mask = mask
+
+      const bg = new PIXI.Graphics()
+      bg.name = 'background'
+      o.addChild(bg)
+      bg.rect(0, 0, size[0], size[1]).fill(opts.bg || 0xffffff)
+
+      if (dict == doc)
+        vue.add_layer(list, o)
+
+      drawDoc(o, children, dict)
+
+      return o
+    },
+    GUIDE(list, dict) {
+      const [type, name, pos] = list
+      const [dir, value] = pos
+      const o = new PIXI.Graphics()
+      if (guides) {guides[name] = o}
+      o.name = name
+      const a = dir === 'HOR' ? [-window.screen.width, 0]
+        : [0, -window.screen.width]
+      const b = dir === 'HOR' ? [window.screen.width, 0]
+        : [0, window.screen.width]
+      o.moveTo(...a).lineTo(...b).stroke(
+        {color: 0x00ffff, width: 2, alpha: .4}
+      )
+      o.value = {direction: dir, value}
+
+      if (dict == doc)
+        vue.add_layer(list, o)
+
+      return o
+    },
+    IMG(list, dict) {
+      const [type, name, box, opts] = list
+      const tmp = new PIXI.Container()
+      tmp.name = name
+      tmp.visible = opts.visible || true
+      const vue_lay = dict == doc
+        ? vue.add_layer(list, tmp) : null
+
+      loader.load('/media/' + opts.src).then(tex => {
+        const o = new PIXI.Sprite(tex)
+        const parent = tmp.parent
+        parent.addChildAt(o, parent.getChildIndex(tmp))
+        tmp.removeFromParent()
+        tmp.destroy()
+        o.anchor.set(.5)
+        if (box[2])
+          o.width = box[2]
+        if (box[3])
+          o.height = box[3]
+        if (box[4]) {o.angle = box[4]}
+        o.position.set(box[0] + (box[2] || 0) / 2, box[1] + (box[3] || 0) / 2)
+        o.interactive = true
+        o.on('mousedown', layer_click)
+        o.name = name
+        dict[o.name] = o
+        //o.id = lay.id
+        //pixi.layers[lay.id] = o
+        //lay.o = obj
+
+        if (vue_lay) {
+          // vue.add_layer(list, o)
+          //vue_lay.value.obj = o
+          //console.log('[vue_lay]', vue_lay)
+          vue_lay.obj = o
+          o.id = vue_lay.id
+          pixi.layers[o.id] = o
+        }
+
+        app.render()
+      })
+
+      return tmp
+    },
+    TEXT(list, dict) {
+      const [type, name, box, opts] = list
+      const tmp = new PIXI.Container()
+      tmp.name = name
+      tmp.visible = opts.visible || true
+      let vue_lay = null
+      if (dict == doc) {
+        vue_lay = vue.add_layer(list, tmp)
+      }
+
+      loader.load({
+        alias: opts.font || 'Lobster',
+        data: {family: opts.font || 'Lobster'},
+        src: `/play/api/get_font/${opts.font || 'Lobster'}/${opts.style || 'Regular'}/`,
+        loadParser: 'loadWebFont',
+      }).then(font => {
+        console.log('[font load]', font)
+        const o = new PIXI.Text()
+        const parent = tmp.parent
+        parent.addChildAt(o, parent.getChildIndex(tmp))
+        tmp.removeFromParent()
+        tmp.destroy()
+        o.text = opts.text || 'Text'
+        o.style.fontFamily = font.family
+        o.style.fontSize = opts.size || 200
+        console.log('[fill]', opts.fill)
+        o.style.fill = opts.fill || 0x666666
+        o.style.align = 'center'
+        o.anchor.set(.5)
+        o.x = box[0] + (box[2] || 0) / 2
+        o.y = box[1] + (box[3] || 0) / 2
+        if (box[2]) {o.width = box[2]}
+        if (box[3]) {o.height = box[3]}
+        if (box[4]) {o.angle = box[4]}
+        o.name = name
+        dict[name] = o
+        o.interactive = true
+        o.on('mousedown', layer_click)
+
+        if (vue_lay) {
+          //vue.add_layer(list, o)
+          //vue_lay.value.obj = o
+          //console.log('[vue_lay]', vue_lay)
+          o.id = vue_lay.id
+          vue_lay.obj = o
+          pixi.layers[o.id] = o
+        }
+
+        app.render()
+      })
+
+      return tmp
+    },
+  }
+
+  const drawDoc = (parent, children, dict) => {
+    children.forEach(item => {
+      if (item[0] in drawFuncs) {
+        parent.addChild(
+          drawFuncs[item[0]](item, dict)
+        )
+      }
+    })
+  }
+
+
+    // APP SETUP
+    ; (async () => {
+      const canvas_div = document.querySelector('#canvas')
+
+      await app.init({
+        backgroundColor: 0x999999,
+        // width:init_width,
+        // height:500,
+        autoStart: false,
+        antialias: false,
+        resizeTo: canvas_div,
+        //hello: true,
+      })
+
+      canvas_div.appendChild(app.canvas)
+      const stage = app.stage
+      stage.name = 'stage'
+      ui.stage = stage
+
+      /*
+        stage
+          origin[c]
+            scaled[c]
+              page[c]          | this part is document
+                page_mask[g]   | the rest is ui
+                bg[g]          |
+            overlay[c]
+              x_axis[g]
+              y_axis[g]
+            ctrl[c]
+              ctrl_pos[c]
+                c[g]
+                l[g]
+                t[g]
+                r[g]
+                b[g]
+                tr[g]
+                br[g]
+      */
+
+      drawDoc(app.stage, [ui_lays], ui)
+      drawDoc(ui.scaled, [doc_raw], doc)
+
+
+
+      const origin = ui.origin
+      const scaled = ui.scaled
+      const overlay = ui.overlay
+      const ctrl = ui.ctrl
+      const ctrl_pos = ui.ctrl_pos
+
+      ui.hit.interactive = true
+      ui.hit.hitArea = new PIXI.Rectangle(0, 0, vnt[2][0], vnt[2][1])
+
+      keys.Esc.press = () => {
+        console.log('[Esc]')
+        ui.hit.visible = false
+        hitff = null
+        vue.mode.value = 'N'
+      }
+
+      keys.KeyT.release = () => {
+        ui.hit.visible = true
+        hitff = 'TEXT'
+        vue.mode.value = 'T'
+      }
+
+      ui.hit.on('mousedown', (ev) => {
+        ui.hit.visible = false
+        if (hitff === 'TEXT') {
+          hitff = null
+          vue.mode.value = 'N'
+          const pos = ui.scaled.toLocal(ev.global)
+          const fill = parseInt(vue.last_color.value.slice(1), 16) || 0
+          doc.page.addChild(
+            drawFuncs.TEXT(
+              ['TEXT',
+                'TextLayer',
+                [pos.x, pos.y],
+                {text: 'Text', fill, font: vue.selected_font.value},
+              ],
+              doc,
+            )
+          )
+        }
+      })
+
+      ctrl_pos.addChild(ctrls.c, ctrls.l, ctrls.t, ctrls.r, ctrls.b, ctrls.tr, ctrls.br)
+      const blue = 0x0d6efd
+      ctrls.c.circle(0, 0, 4).fill(blue)
+      ctrls.l.moveTo(-1, -.5).lineTo(-1, .5).stroke({color: blue, width: 2, alignment: 1})
+      ctrls.r.moveTo(-1, -.5).lineTo(-1, .5).stroke({color: blue, width: 2, alignment: 1})
+      ctrls.t.moveTo(-.5, 1).lineTo(.5, 1).stroke({color: blue, width: 2, alignment: 1})
+      ctrls.b.moveTo(-.5, 1).lineTo(.5, 1).stroke({color: blue, width: 2, alignment: 1})
+      ctrls.tr.circle(0, 0, 6).fill(blue)
+      ctrls.br.rect(-5, -5, 10, 10).fill(blue)
+      ctrls.r.interactive = ctrls.b.interactive = ctrls.tr.interactive = ctrls.c.interactive = ctrls.br.interactive = true
+      ctrls.r.cursor = ctrls.b.cursor = ctrls.tr.cursor = ctrls.br.cursor = 'crosshair'
+      ctrls.c.cursor = 'move'
+      ctrls.r.hitArea = new PIXI.Rectangle(-5, -0.5, 10, 1)
+      ctrls.b.hitArea = new PIXI.Rectangle(-0.5, -5, 1, 10)
+      window.t = ctrls.t
+      window.l = ctrls.l
+
+      // drag move
+
+      //ctrl_pos.on('mousedown', ctrl_pos_on_mousedown)
+      ctrls.c.on('mousedown', ctrl_pos_on_mousedown)
+
+      // scale right
+      const on_scale_right2 = e => {
+        e.stopPropagation()
+        const m = e.global.clone()
+
+        // norm vector along scale direction (in global space)
+        const unit = new PIXI.Point(Math.cos(pixi.active.rotation), Math.sin(pixi.active.rotation))
+
+        const p = ctrl_pos.position.clone()
+        const w = pixi.active.width
+
+        const ctrl_t_w = ctrls.t.width
+        const ctrl_l_x = ctrls.l.x
+
+        mmf = mm => {
+          // mouse move delta along scale norm vector
+          // mouse move vector projection to scale norm vector
+          // (in global space)
+          const mm_proj = proj(mm.global.subtract(m), unit)
+
+          // new ctrl position, old position + half delta of mouse move projection to
+          // norm vector (ctrl position exists in global space)
+          ctrl_pos.position.set(p.x + mm_proj.x / 2, p.y + mm_proj.y / 2)
+
+          // update ctrl graphics
+          ctrls.t.width = ctrls.b.width = ctrl_t_w + mm_proj.length
+          const v = ctrl_l_x - mm_proj.length / 2
+          ctrls.l.x = v
+          ctrls.r.x = ctrls.tr.x = ctrls.br.x = -v
+
+          // ctrl position in ctrl overlay + global origin position =>
+          // ctrl global position
+          // new active layer position - is ctrl new global position translated to
+          // active layer local space
+          pixi.active.parent.toLocal(ctrl_pos.position.add(origin.position), null, pixi.active.position)
+
+          // new active layer width - is old width + mouse move projection to scale
+          // vector corrected by scale (translated to local space)
+          // TODO: take into account if active layer is inside another scaled container
+          pixi.active.width = w + mm_proj.length / scaled.scale.x
+
+          app.render()
+        }
+
+        mmef = () => {
+          ctrls.c.hitArea = new PIXI.Rectangle(ctrls.l.x, ctrls.t.y, ctrls.t.width, ctrls.l.height)
+        }
+      }
+      ctrls.r.on('mousedown', on_scale_right2)
+
+      // scale bottom
+      const on_scale_bottom2 = e => {
+        e.stopPropagation()
+        const m = e.global.clone()
+        const unit = new PIXI.Point(Math.cos(pixi.active.rotation + Math.PI / 2), Math.sin(pixi.active.rotation + Math.PI / 2))
+        const p = ctrl_pos.position.clone()
+        const h = pixi.active.height
+
+        const ctrl_h = ctrls.l.height
+        const ctrl_t_y = ctrls.t.y
+
+        mmf = mm => {
+          const mm_proj = proj(mm.global.subtract(m), unit)
+          ctrl_pos.position.set(p.x + mm_proj.x / 2, p.y + mm_proj.y / 2)
+          ctrls.l.height = ctrls.r.height = ctrl_h + mm_proj.length
+          ctrls.t.y = ctrls.tr.y = ctrl_t_y - mm_proj.length / 2
+          ctrls.b.y = ctrls.br.y = -ctrl_t_y + mm_proj.length / 2
+          pixi.active.parent.toLocal(ctrl_pos.position.add(origin.position), null, pixi.active.position)
+          pixi.active.height = h + mm_proj.length / scaled.scale.x
+          app.render()
+        }
+
+        mmef = () => {
+          ctrls.c.hitArea = new PIXI.Rectangle(ctrls.l.x, ctrls.t.y, ctrls.t.width, ctrls.l.height)
+        }
+      }
+      ctrls.b.on('mousedown', on_scale_bottom2)
+
+      // scale bottom right
+      const on_scale_br2 = e => {
+        e.stopPropagation()
+        const m = e.global.clone()
+        const diag_rad = Math.acos(ctrls.t.width / Math.hypot(ctrls.t.width, ctrls.l.height)) + pixi.active.rotation
+        const unit = new PIXI.Point(Math.cos(diag_rad), Math.sin(diag_rad))
+        const p = ctrl_pos.position.clone()
+        const w = pixi.active.width
+        const h = pixi.active.height
+        const ctrl_t_w = ctrls.t.width - 4
+        const ctrl_l_h = ctrls.l.height - 4
+        const ctrl_t_y = ctrls.t.y + 1
+        const ctrl_l_x = ctrls.l.x + 1
+        const d = Math.hypot(ctrl_t_w, ctrl_l_h)
+        const scale = pixi.active.scale.clone()
+        mmf = mm => {
+          const mm_proj = proj(mm.global.subtract(m), unit)
+          ctrl_pos.position.set(p.x + mm_proj.x / 2, p.y + mm_proj.y / 2)
+          //ctrls.t.width = ctrls.b.width = ctrl_t_w + mm_proj.x
+          //ctrls.l.height = ctrls.r.height = ctrl_l_h + mm_proj.y
+          //ctrls.t.width = ctrls.b.width = ctrl_t_w * mm_proj.length
+          //ctrls.l.height = ctrls.r.height = ctrl_l_h * mm_proj.length
+          const s = (d + mm_proj.length) / d
+          ctrls.t.width = ctrls.b.width = ctrl_t_w * s + 4
+          ctrls.l.height = ctrls.r.height = ctrl_l_h * s + 4
+          //const v = ctrl_l_x - mm_proj.x/2
+          //const u = ctrl_t_y - mm_proj.y/2
+          //ctrls.l.x = ctrl_l_x * mm_proj.length/2
+          ctrls.l.x = ctrl_l_x * s - 1
+          ctrls.r.x = ctrls.tr.x = ctrls.br.x = -ctrl_l_x * s + 1
+          ctrls.t.y = ctrls.tr.y = ctrl_t_y * s - 1
+          ctrls.b.y = ctrls.br.y = -ctrl_t_y * s + 1
+          pixi.active.parent.toLocal(ctrl_pos.position.add(origin.position), null, pixi.active.position)
+          scale.multiplyScalar(s, pixi.active.scale)
+          app.render()
+        }
+        mmef = () => {
+          ctrls.c.hitArea = new PIXI.Rectangle(ctrls.l.x, ctrls.t.y, ctrls.t.width, ctrls.l.height)
+        }
+      }
+      ctrls.br.on('mousedown', on_scale_br2)
+
+      const on_rotate_selected = e => {
+        e.stopPropagation()
+        const c = ctrl_pos.getGlobalPosition()
+        const ctrl_p = page.toLocal(c, null)
+        const m_c = e.global.subtract(c)
+        const rot = Math.atan2(m_c.y, m_c.x)
+        const ctrl_rot = ctrl_pos.rotation
+        const rotation = {}
+        const position = {}
+        for (let l of pixi.selected) {
+          rotation[l.id] = l.rotation
+          position[l.id] = l.position.subtract(ctrl_p)
+        }
+        mmf = mm => {
+          const m_c1 = mm.global.subtract(c)
+          const delta_rot = Math.atan2(m_c1.y, m_c1.x) - rot
+          ctrl_pos.rotation = ctrl_rot + delta_rot
+
+          const cos = Math.cos(delta_rot)
+          const sin = Math.sin(delta_rot)
+          for (let l of pixi.selected) {
+            l.rotation = rotation[l.id] + delta_rot
+            l.x = position[l.id].x * cos - position[l.id].y * sin + ctrl_p.x
+            l.y = position[l.id].y * cos + position[l.id].x * sin + ctrl_p.y
+          }
+
+          app.render()
+        }
+      }
+
+      const on_rotate = e => {
+
+        if (pixi.selected.size > 1) {
+          on_rotate_selected(e)
+          return
+        }
+
+        e.stopPropagation()
+        const c = ctrl_pos.getGlobalPosition()
+        const v = e.global.subtract(c)
+        const r = pixi.active.rotation - Math.atan2(v.y, v.x)
+        mmf = mm => {
+          const v1 = mm.global.subtract(c)
+          ctrl_pos.rotation = pixi.active.rotation = r + Math.atan2(v1.y, v1.x)
+          app.render()
+        }
+      }
+      ctrls.tr.on('mousedown', on_rotate)
+
+      const destroyCtrl = () => {
+        if (!ctrl_pos.visible) {return }
+        /*
+        for (let i = ctrl_pos.children.length-1;i>=0;i--) {
+          ctrl_pos.children[i].destroy({children:true})
+        }
+        ctrl_pos.destroy({children:true})
+        ctrl_pos = null
+        */
+        ctrl_pos.visible = false
+        pixi.active = null
+
+        pixi.selected.clear()
+
+        //vueff.selectLayerId()
+        vue.select_layer()
+        app.render()
+      }
+
+      const stage_click = e => {
+        if (keys.Space.isDown) {
+          start_drag_page(e)
+        } else (
+          destroyCtrl(e)
+        )
+      }
+
+      const on_zoom = e => {
+        e.stopPropagation()
+        const c = new PIXI.Point(app.screen.width / 2, app.screen.height / 2)
+        const x = e.global.x
+        const s = scaled.scale.x
+        const p = origin.position.clone()
+        mmf = mm => {
+          const k = 1 + (mm.global.x - x) / app.screen.width
+          scaled.scale.set(s * k)
+
+          p.subtract(c).multiplyScalar(k).add(c, origin.position)
+
+          update_axis()
+
+          //if (active) {drawCtrl(active, true)}
+          if (pixi.selected.size > 1) {drawSelectedCtrl()}
+          else if (pixi.selected.size === 1) {drawActiveCtrl()}
+          else {app.render()}
+        }
+      }
+
+      const stage_zoom_ctrl = new PIXI.Graphics()
+      stage.addChild(stage_zoom_ctrl)
+      stage_zoom_ctrl.beginFill(0x00ffff, .4).drawRect(-10, -10, 20, 20).endFill()
+      stage_zoom_ctrl.position.set(app.screen.width / 2 + 11, app.screen.height - 15)
+      stage_zoom_ctrl.interactive = true
+      stage_zoom_ctrl.cursor = 'zoom-in'
+      stage_zoom_ctrl.on('mousedown', on_zoom)
+
+      const stage_move_ctrl = new PIXI.Graphics()
+      stage.addChild(stage_move_ctrl)
+      stage_move_ctrl.beginFill(0x00ffff, .4).drawRect(-15, -15, 30, 30).endFill()
+      stage_move_ctrl.position.set(app.screen.width / 2 - 16, app.screen.height - 20)
+      stage_move_ctrl.interactive = true
+      stage_move_ctrl.cursor = 'move'
+      stage_move_ctrl.on('mousedown', e => {
+        e.stopPropagation()
+        start_drag_page(e)
+      })
+
+      stage.interactive = true
+      stage.hitArea = new PIXI.Rectangle(
+        -window.screen.width, -window.screen.height,
+        2 * window.screen.width, 2 * window.screen.height
+      )
+      stage.on('mouseup', e => {
+        mmf = null
+        if (mmef) {
+          mmef(e)
+          mmef = null
+        }
+      })
+      stage.on('mouseupoutside', e => {
+        mmf = null
+        if (mmef) {
+          mmef(e)
+          mmef = null
+        }
+      })
+      stage.on('mousemove', e => {
+        if (mmf) {
+          mmf(e)
+          app.render()
+        }
+      })
+      stage.on('mousedown', stage_click)
+      stage.on('wheel', e => {
+        const k = e.deltaY < 0 ? 1.1 : 0.9090909090909091
+
+        // (origin - e.global) * s + e.global
+        origin.position.subtract(e.global).multiplyScalar(k).add(e.global, origin.position)
+        scaled.scale.set(scaled.scale.x * k)
+        update_axis()
+
+        //if (active) {drawCtrl(active, true)}
+        //if (active) {drawActiveCtrl()}
+        if (pixi.selected.size > 1) {drawSelectedCtrl()}
+        else if (pixi.selected.size === 1) {drawActiveCtrl()}
+        else {app.render()}
+      })
+
+      // DRAW LAYERS
+      // TODO delete
+      const drawRectLay = (lay, parent) => {
+        const obj = new PIXI.Graphics()
+        parent.addChild(obj)
+        obj.beginFill(lay.col).drawRect(-0.5 * lay.w, -0.5 * lay.h, lay.w, lay.h).endFill()
+        obj.position.set(lay.x || 0, lay.y || 0)
+        obj.interactive = true
+        obj.on('mousedown', layer_click)
+        obj.name = lay.n
+        obj.id = lay.id
+        pixi.layers[lay.id] = obj
+        lay.obj = obj
+      }
+
+      // TODO delete
+      const drawTrgLay = (lay, parent) => {
+        const obj = new PIXI.Graphics()
+        parent.addChild(obj)
+        obj.name = lay.n
+        obj.id = lay.id
+        pixi.layers[lay.id] = obj
+        lay.obj = obj
+        obj.interactive = true
+        obj.lineStyle(2, 'red').drawRect(-lay.data[2][2] / 2, -lay.data[2][3] / 2, lay.data[2][2], lay.data[2][3])
+        obj.position.set(lay.data[2][0] + lay.data[2][2] / 2, lay.data[2][1] + lay.data[2][3] / 2)
+      }
+
+      const page = doc.page
+
+      // ZOOM and CENTER
+      const zoom = .15
+      scaled.scale.set(zoom)
+      origin.position.set(
+        (app.screen.width - vnt[2][0] * zoom) / 2,
+        (app.screen.height - vnt[2][1] * zoom) / 2
+      )
+      update_axis()
+
+      const get_document = window.get_document = (root = page) => {
+        const mask = root.mask
+        const bg = root.children.find(i => i.name === 'bg')
+        const res = ['PAGE', root.name, [mask.width, mask.height], {bg: 0xffffff}]
+        const children = []
+        res.push(children)
+        root.children.slice(2).forEach(layer => {
+          if (layer instanceof PIXI.Sprite) {
+            const local_width = layer.texture.orig.width * layer.scale.x
+            console.log('[IMG width]', local_width, layer.width)
+            const local_height = layer.texture.orig.height * layer.scale.y
+            const box = [
+              round(layer.x - .5 * local_width),
+              round(layer.y - .5 * local_height),
+              round(local_width),
+              round(local_height),
+            ]
+            if (layer.angle) {box.push(round(layer.angle))}
+            const item = ['IMG', layer.name, box, {src: layer.texture.baseTexture.source._sourceOrigin.split('/').slice(-1)[0], }]
+            children.push(item)
+          } else if (layer instanceof PIXI.Text) {
+            const box = [
+              layer.x - .5 * layer.width,
+              layer.y - .5 * layer.height,
+              layer.width,
+              layer.height,
+            ].map(i => round(i))
+            if (layer.angle) {box.push(round(layer.angle))}
+            children.push([
+              'TEXT', layer.name, box, {
+                text: layer.text,
+                fill: layer.style.fill,
+                size: layer.style.fontSize,
+                font: layer.style.fontFamily,
+              }
+            ])
+          }
+        })
+
+        return res
+      }
+
+      keys.Delete.press = () => {
+        if (pixi.active) {
+          //vueff.deleteLayerId(pixi.active.id)
+          vue.delete_layer(pixi.active.id)
+          pixi.active.destroy({children: true})
+          destroyCtrl()
+        }
+      }
+
+      app.render()
+    })();
+</script>

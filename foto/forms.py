@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -54,7 +55,8 @@ class ContactInfoForm(forms.Form):
 
 
 class UploadBlanksForm(forms.Form):
-  session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
+  # session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
+  session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(i.name, i.name) for i in (settings.MEDIA_ROOT / 'blanks').iterdir() if i.is_dir()])
   sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
   # yr = forms.CharField(label='YR', required=True)
   yr = forms.ChoiceField(label="Год", required=True, choices=[

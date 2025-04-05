@@ -1,9 +1,50 @@
 {% extends 'base.html' %}
 
+{% load mytags %}
+
 {% block title %}fZ - {{album.name}} {{album.get_img}}{% endblock title %}
 
 {% block js %}
   <script>
+    const sum = list => list.reduce((a, b) => a + b, 0)
+    function map(fn,list){
+      if (list===void 0) return function(list){return map(fn, list)}
+      var l = list.length
+      if (l===0) return []
+      var res = Array(l)
+      for (var i=0;i<l;i++)
+        res[i] = fn(list[i], i, list)
+      return res
+    }
+    const compose = f => g => a => f(g(a))
+    const pipe = (...args) => fold(_pipe, args[0], tail(args))
+    const pipe2 = f => g => a => g(f(a))
+    const _pipe = (f,g) => (...args) => g.call(null, f.apply(null, args))
+    function fold(fn, acc, list){
+      if (list===void 0)
+        return list => fold(fn, acc, list)
+      for (var i = 0, l = list.length; i<l; i++)
+        acc = fn(acc, list[i], i, list)
+      return acc
+    }
+    const tail = list => drop(1, list)
+    function drop(n,list){
+      if (list===void 0)
+        return list => drop(n, list)
+      if (Array.isArray(list))
+        return list.slice(n)
+      if (isArrayLike(list)){
+        var res = [], i = n<0?list.length-n:n, l = list.length
+        while (i<l) res.push(list[i++])
+        return res
+      }
+    }
+    function isArrayLike(a){return a!=null&&typeof(a)=="object"&&a.length>=0}
+    const product = ([a,b]) => a * b
+    const apply = a => f => f(a)
+    const flip = f => b => a => f(a,b)
+
+
     ;document.addEventListener('DOMContentLoaded', () => {
 
       const inputs = document.querySelectorAll('input[type=number][data-price]')
@@ -18,16 +59,53 @@
       const btns_plus = document.querySelectorAll('button[data-plus]')
       const btns_minus = document.querySelectorAll('button[data-minus]')
 
-      function calc() {
-        return Array.from(inputs).reduce((m,i)=>
-          m + parseInt(i.value || 0) * parseFloat(i.dataset.price)
-        ,0)
+      //function calc() {
+      //  return Array.from(inputs).reduce((m,i)=>
+      //    m + parseInt(i.value || 0) * parseFloat(i.dataset.price)
+      //  ,0)
+      //}
+
+      // f : a -> b
+      // map : (a->b) -> [a] -> [b]
+      // flip : (a->b->c) -> b -> a -> c
+      // flip(map) : [a] -> (a->b) -> [b]
+      // apply : a -> f -> b
+
+      // ? : [f] -> a -> [b]
+      // pipe(apply, flip(map)([f, f]))
+      // flip(map) ([f, f]) (apply(a))
+      // ? : [a -> b] -> a -> [b]
+      // const f = ff => pipe(apply, flip(map)(ff))
+      // compose : (b -> c) -> (a -> b) -> a -> c
+      // pipe(flip(map), compose(apply))
+      // ? : (a->b) -> (b->c) -> a -> c
+      // : [a->b] -> a -> [b]
+      const applyFuncs = pipe(flip(map), pipe2(apply))
+
+      const calc = () => {
+        return pipe(
+          Array.from,
+          /// 1
+          // map(i => parseInt(i.value||0) * parseFloat(i.dataset.price)),
+          /// 2
+          //map(pipe(
+          //  apply,
+          //  flip(map)([i=>parseInt(i.value||0), i=>parseFloat(i.dataset.price)]),
+          //  product,
+          //)),
+          /// 3
+          map(pipe(
+            applyFuncs([i=>parseInt(i.value||0), i=>parseFloat(i.dataset.price)]),
+            product,
+          )),
+          sum,
+        )(inputs)
       }
 
       function calcSum(e) {
         const sum = calc()
         totals.forEach(i=>i.textContent=sum)
-        if (sum >= {{goods.BONUS.sum}}) {
+        if (sum >= {{album.get_pricelist.get_empty_copy.bonus.sum}}) {
           eport0.forEach(i=>i.classList.add('d-none'))
           eport1.forEach(i=>i.classList.remove('d-none'))
         } else {
@@ -66,9 +144,10 @@
       btns_plus.forEach(btn=>btn.addEventListener('click', plus_click))
       btns_minus.forEach(btn=>btn.addEventListener('click', minus_click))
 
-      if (calcSum()) {
-        cancel_btns.forEach(el => el.classList.remove('d-none'))
-      }
+      //if (calcSum()) {
+      //  cancel_btns.forEach(el => el.classList.remove('d-none'))
+      //}
+      calcSum()
 
       const inputs_arr = Array.from(inputs)
 
@@ -79,15 +158,25 @@
           alert('Ничего не заказано')
         } else if (inputs_arr.filter(i=>i.name.endsWith('_tshirt') && i.value != '0').length && !inputs_arr.filter(i=>i.name.endsWith('_tsize') && i.value != '0').length) {
           e.preventDefault()
+          const index = inputs_arr.findIndex(i=>i.name.endsWith('_tshirt') && i.value != '0')
+          const input = inputs_arr.slice(index).find(i=>i.name.endsWith('_tsize'))
           alert('Заказывая футболку - укажите размер!')
+          setTimeout(()=>{
+            input.scrollIntoView()
+            input.focus()
+          }, 0)
         }
       })
+
+      const errorlist = document.querySelector('ul.errorlist')
+      if (errorlist) {errorlist.scrollIntoView()}
 
     });
   </script>
 {% endblock js %}
 
 {% block content %}
+  {% with empty_copy=album.get_pricelist.get_empty_copy %}
   <div class="position-sticky top-0 z-3 shadow bg-white">
     <nav class="navbar pb-0">
       <div class="container-fluid justify-content-center pb-2 border-bottom">
@@ -100,20 +189,22 @@
             <button id="submit_btn" name="action" value="save" form="order_form" class="btn btn-outline-success">
               Сохранить заказ
             </button>
-            <button class="btn btn-outline-danger d-none ms-2" name="action" value="cancel_order" form="order_form">
-              Отменить
-            </button>
+            {% if album.is_ordered %}
+              <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+                Отменить
+              </button>
+            {% endif %}
           {% endif %}
         </span>
       </div>
 
       <div class="d-none d-md-block w-100">
         <div class="eport0 container-fluid justify-content-center text-center bg-primary text-white py-2 d-none">
-          {{goods.BONUS.text}}
+          {{album.get_pricelist.get_empty_copy.bonus.text}}
         </div>
 
         <div class="eport1 container-fluid justify-content-center text-center bg-success text-white py-2 d-none">
-          {{goods.BONUS.success}}
+          {{album.get_pricelist.get_empty_copy.bonus.success}}
         </div>
       </div>
     </nav>
@@ -121,11 +212,11 @@
 
   <div class="d-block d-md-none w-100">
     <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
-      {{goods.BONUS.text}}
+      {{album.get_pricelist.get_empty_copy.bonus.text}}
     </div>
 
     <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
-      {{goods.BONUS.success}}
+      {{album.get_pricelist.get_empty_copy.bonus.success}}
     </div>
   </div>
 
@@ -134,58 +225,78 @@
       {% csrf_token %}
 
       <div class="row">
-      {% for good_name, item in goods.items %}
-        {% if not good_name == 'BONUS' %}
+        {% for theme_k, theme in empty_copy.themes.items %}
           <div class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4">
             <div class="card shadow">
-              {% if "style" in item or "blank_img_style" in item %}
+
+              {% if "style" in theme or "blank_img_style" in theme %}
                 <div class="card-img-top"
-                style="background-image:url('{{blank}}');{% if item.blank_img_style %}{{item.blank_img_style}}{% else %}{{item.style}}{% endif %}">
+                style="background-image:url('{{album.get_blank_url}}');{% if theme.blank_img_style %}{{theme.blank_img_style}}{% else %}{{theme.style}}{% endif %}">
                 </div>
               {% endif %}
-              <div class="card-body">
-                <h5 class="card-title"><strong>{{item.title}}</strong></h5>
-                {% for name, good in item.amounts.items %}
-                  <!-- name: {{ name }} -->
-                  <div class="row border-top">
 
-                    <div class="col-4 d-flex align-items-center">{{good.title}}</div>
+              <div class="card-body">
+                <h5 class="card-title"><strong>{{theme.ru}}</strong></h5>
+                {% for format_k in theme.formats %}
+                {% with order_k=theme_k|add:'_'|add:format_k order=album.get_order_or_post_data format=empty_copy.formats|lookup:format_k %}
+                  <div class="row border-top">
+                    <div class="col-4 d-flex align-items-center">{{format.ru}}</div>
                     <div class="col-4 d-flex align-items-center justify-content-center">
-                      {% if name == 'tsize' %}
+                      {% if format_k == 'tsize' %}
                         <span class="text-secondary">см</span>
                       {% else %}
-                        {{good.price}} <span class="text-secondary ms-1">руб</span>
+                        {{format.price}} <span class="text-secondary ms-1">руб</span>
                       {% endif %}
                     </div>
                     <div class="col-4 d-flex align-items-center">
 
                       <div class="input-group input-group-sm flex-nowrap">
-                        {% if name == 'tsize' %}
+                        {% if format_k == 'tsize' %}
                         {% else %}
-                          <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-minus="1"><i class="bi bi-dash-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                          <button
+                            class="btn btn-sm btn-outline-primary"
+                            data-name="{{theme_k}}_{{format_k}}"
+                            data-minus="1">
+                            <i class="bi bi-dash-lg" data-name="{{theme_k}}_{{format_k}}"></i>
+                          </button>
                         {% endif %}
 
-                        {% if name == 'tsize' %}
-                          <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control" value="{{good.q}}" data-price="{{good.price}}">
+                        {% if format_k == 'tsize' %}
+                          <input
+                            name="{{theme_k}}_{{format_k}}"
+                            type="number"
+                            min="0"
+                            class="w-100 text-center form-control"
+                            value="{{order|lookup:order_k|default:'0'}}"
+                            data-price="{{format.price}}">
                         {% else %}
-                          <input name="{{good_name}}_{{name}}" type="number" min="0" class="w-100 text-center form-control d-none" value="{{good.q}}" data-price="{{good.price}}">
+                          <input
+                            name="{{theme_k}}_{{format_k}}"
+                            type="number"
+                            min="0"
+                            class="w-100 text-center form-control d-none"
+                            value="{{order|lookup:order_k|default:'0'}}"
+                            data-price="{{format.price}}">
 
-                          <span class="input-group-text fw-bold" data-name="{{good_name}}_{{name}}">{{good.q}}</span>
+                          <span class="input-group-text fw-bold" data-name="{{theme_k}}_{{format_k}}">
+                            {{order|lookup:order_k|default:'0'}}
+                          </span>
                         {% endif %}
 
-                        {% if name == 'tsize' %}
+                        {% if format_k == 'tsize' %}
                         {% else %}
-                          <button class="btn btn-sm btn-outline-primary" data-name="{{good_name}}_{{name}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{good_name}}_{{name}}"></i></button>
+                          <button class="btn btn-sm btn-outline-primary" data-name="{{theme_k}}_{{format_k}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{theme_k}}_{{format_k}}"></i></button>
                         {% endif %}
                       </div>
+
                     </div>
                   </div>
+                {% endwith %}
                 {% endfor %}
               </div>
             </div>
           </div>
-        {% endif %}
-      {% endfor %}
+        {% endfor %}
       </div>
 
       <div class="row justify-content-center mb-3">
@@ -207,25 +318,27 @@
             <button id="form_subm_btn" name="action" value="save" class="btn btn-outline-success">
               Сохранить заказ
             </button>
-            <button class="btn btn-outline-danger d-none ms-2" name="action" value="cancel_order" form="order_form">
-              Отменить
-            </button>
+            {% if album.is_ordered %}
+              <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+                Отменить
+              </button>
+            {% endif %}
           {% endif %}
         </div>
       </div>
     </form>
-
   </div>
 
   <div class="d-block d-md-none w-100">
     <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
-      {{goods.BONUS.text}}
+      {{album.get_pricelist.get_empty_copy.bonus.text}}
     </div>
 
     <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
-      {{goods.BONUS.success}}
+      {{album.get_pricelist.get_empty_copy.bonus.success}}
     </div>
   </div>
+  {% endwith %}
 
 {% endblock content %}
 

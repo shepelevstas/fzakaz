@@ -15,6 +15,7 @@ urlpatterns = [
     # path('upload_blanks/7f094d61-bb45-4375-81fe-32fcbb383d5c/', views.upload_blanks, name='upload_blanks'),
 
     path('manage_blanks/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_blanks, name='manage_blanks'),
+    path('manage_albums/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_albums, name='manage_blanks'),
 
     path('orders/3528ca60-28b5-49d1-8574-66897823a017/', views.orders, name='orders'),
 
@@ -27,16 +28,17 @@ urlpatterns = [
     path('<str:sign>/orders_file/', views.orders_file, {'format': 'json'}, name='orders_file'),
     path('<str:sign>/excel_file/', views.orders_file, {'format': 'excel'}, name='excel_file'),
 
-    # kadr
-    path('kadr/', include('kadr.urls')),
-
-    path('work/', include('work.urls')),
-
     path('admin/', admin.site.urls),
-
-    # path('play/', views.play, name='play'),
-    path('play/', include('play.urls')),
 ]
 
 if settings.DEBUG:
+    urlpatterns += [
+        # kadr
+        path('kadr/', include('kadr.urls')),
+
+        path('work/', include('work.urls')),
+
+        # path('play/', views.play, name='play'),
+        path('play/', include('play.urls')),
+    ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
