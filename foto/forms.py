@@ -58,9 +58,9 @@ class ContactInfoForm(forms.Form):
 class UploadBlanksForm(forms.Form):
   # session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
   # session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(i.name, i.name) for i in (settings.MEDIA_ROOT / 'blanks').iterdir() if i.is_dir()])
-  session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(str(s), str(s)) for s in Session.objects.filter(deleted=None)])
+  session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[])
   # sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
-  sh = forms.ChoiceField(label='SH', required=True, widget=forms.Select(attrs={'class': 'form-control w-auto'}), choices=[(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))])
+  sh = forms.ChoiceField(label='SH', required=True, widget=forms.Select(attrs={'class': 'form-control w-auto'}), choices=[])
   yr = forms.ChoiceField(label="Год", required=True, choices=[
     (i,i) for i in range(1,12)
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
@@ -68,5 +68,10 @@ class UploadBlanksForm(forms.Form):
     (i, i) for i in 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ'
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
   files = MultipleFileField(required=True, label="Файлы", attrs={'accept': 'image/jpeg', 'style': 'width:0'})
+
+  def __init__(self, *args, **kwargs):
+    super(UploadBlanksForm, self).__init__(*args, **kwargs)
+    self.fields['session'].choices = [(str(s), str(s)) for s in Session.objects.filter(deleted=None)]
+    self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
 
 
