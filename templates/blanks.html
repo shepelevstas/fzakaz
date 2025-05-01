@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}fZ - {{album.name}}{% endblock title %}
+
+{% block content %}
+  <div class="sticky-top p-2 bg-white shadow text-center start-0 end-0">
+    <h2>Школа {{ album.sh }} - Класс {{ album.shyear }} "{{ album.group }}" <small class="text-secondary">({{ album.session }})</small></h2>
+  </div>
+
+  <div class="container">
+    <div class="d-flex flex-wrap justify-content-center p-4">
+      {% for order in orders %}
+        <a href="{{ order.url }}" class="m-1 shadow-sm">
+          <img src="{{order.blank.url}}" alt="{{order.imgname}}" style="width:150px;" class="shadow-sm">
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock content %}

@@ -4,46 +4,16 @@
 
 {% block title %}fZ - albums{% endblock title %}
 
-{% block js_libs %}
-  {{ block.super }}
-  <script src="{% static 'js/clipboard.min.js' %}"></script>
-  {% comment %} <script src="/static/upq.js"></script> {% endcomment %}
-{% endblock js_libs %}
-
 
 {% block content %}
-  {% if edit %}
-    <div class="position-sticky top-0 shadow bg-white p-2 z-1">
-      <form id="upload_form" action="." method="post" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center">
-        {% csrf_token %}
 
-        {% for f in form %}
-          {% if f.name == 'files' %}
-            <label>
-              <span id="id_select_files_btn" class="btn btn-success">Выбрать файлы</span>
-              {{f}}
-              {% comment %} <div class="d-none"></div> {% endcomment %}
-            </label>
-          {% else %}
-            {{f.label}}:{{f}}
-          {% endif %}
-        {% endfor %}
-
-        <button type='submit' name='action' value='upload' class="btn btn-primary">upload</button>
-
-        <span class="d-none spinner-border spinner-border-sm"></span>
-
-        <span id="id_done" class="d-none"></span>
-      </form>
-    </div>
-  {% endif %}
-
-  <div class="container-fluid py-2">
+  <div class="container-fluid py-2 d-flex flex-wrap">
 
     {% getlist request.GET 'ses' as ses_list %}
     {% for ses in ses_list %}
       {% if ses %}
-        <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses }}" class="btn btn-sm btn-outline-primary rounded-pill">
+        <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses }}"
+          class="btn btn-sm btn-outline-primary rounded-4 me-2 my-1">
           <i class="bi bi-x-circle-fill"></i> Съемка: {{ses}}
         </a>
       {% endif %}
@@ -52,11 +22,26 @@
     {% getlist request.GET 'sh' as sh_list %}
     {% for sh in sh_list %}
       {% if sh %}
-        <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh }}" class="btn btn-sm btn-outline-primary rounded-pill">
+        <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh }}"
+          class="btn btn-sm btn-outline-primary rounded-4 me-2 my-1">
           <i class="bi bi-x-circle-fill"></i> Школа: {{sh}}
         </a>
       {% endif %}
     {% endfor %}
+
+    <button class="btn btn-sm btn-primary ms-auto my-1"
+      id="id_modal_pricelists_toggle"
+      data-bs-toggle="modal"
+      data-bs-target="#id_modal_pricelists"
+    >
+      Прайсы
+    </button>
+
+    <button class="btn btn-sm btn-success ms-2 my-1"
+      id="id_modal_upload_toggle"
+      data-bs-toggle="modal"
+      data-bs-target="#id_modal_upload"
+    ></button>
   </div>
 
   <table class="table table-sm bg-white">
@@ -76,7 +61,8 @@
           <td class="ps-2 ps-lg-4">
             {{album.session}}
             {% if 'ses' not in request.GET or not request.GET.ses %}
-              <a href="{{request.get_full_path|add_q_param:'ses'|add_q_value:album.session}}" title="Показать только эту съемку">
+              <a href="{{request.get_full_path|add_q_param:'ses'|add_q_value:album.session}}"
+                title="Показать только эту съемку">
                 <i class="bi bi-funnel"></i>
               </a>
             {% endif %}
@@ -85,12 +71,13 @@
           {# ALBUM #}
           <td class="text-center">
             {% if 'sh' not in request.GET or not request.GET.sh %}
-              <a href="{{request.get_full_path|add_q_param:'sh'|add_q_value:album.sh}}" title="Показать только эту школу">
+              <a href="{{request.get_full_path|add_q_param:'sh'|add_q_value:album.sh}}"
+                title="Показать только эту школу">
                 <i class="bi bi-funnel"></i>
               </a>
             {% endif %}
 
-            <a href="{% url 'signed_view' album.sign %}">{{album.name}}</a>
+            <a href="{% url 'blanks' album.sign %}">{{album.name}}</a>
             <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'signed_view' album.sign %}">
               {% comment %} <i class="bi bi-link-45deg"></i> {% endcomment %}
               <i class="bi bi-copy"></i>
@@ -159,109 +146,376 @@
     </tbody>
   </table>
 
-  {% comment %} TODO ajax upload bar {% endcomment %}
-  <div id="upload_bar" class="position-fixed bottom-0 bg-white shadow shadow-lg w-100 p-2" style="transition:transform .5s;transform:translatey(100%);">
-    <div class="progress rounded-pill">
-      <div class="progress-bar" style="width: 0%;"></div>
-    </div>
-  </div>
 {% endblock content %}
 
 
 {% block js %}
+  <script src="{% static 'js/clipboard.min.js' %}"></script>
+  <script>;document.addEventListener('DOMContentLoaded', () => {new ClipboardJS('.copylink')});</script>
+  <script src="/static/js/vue3513.global.min.js"></script>
+  <span id="id_mount"></span>
+
+  <div class="modal fade" tabindex="-1" id="id_modal_upload">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content shadow"></div>
+    </div>
+  </div>
+
+  <div class="modal fade" tabindex="-1" id="id_modal_pricelists">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content shadow"></div>
+    </div>
+  </div>
+
+  <template id="id_vue_app">
+    <Teleport to="#id_modal_upload_toggle">
+      <template v-if='state==="uploading"'>
+        Загрузка бланков:
+        <span class="spinner-border spinner-border-sm" role="status">
+          <span class="visually-hidden">Загрузка...</span>
+        </span>
+        [[ que.length - todo.length ]] / [[ que.length ]]
+      </template>
+      <span v-else>
+        Загрузить бланки<span v-if='que.length'> ([[ que.length ]])</span>
+      </span>
+    </Teleport>
+
+    <Teleport to="#id_modal_upload .modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Загрузить бланки</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-1">
+          <strong class="me-1">Съемка</strong>
+          {% for x,y in form.fields.session.choices %}
+            <input type="radio" class="btn-check" name="ses" value='{{x}}' v-model='ses' id="id_ses_{{x}}" autocomplete="off">
+            <label class="btn" for="id_ses_{{x}}">{{y}}</label>
+          {% endfor %}
+        </div>
+
+        <div class="mb-1">
+          <strong class="me-1">Школа</strong>
+          {% for x,y in form.fields.sh.choices %}
+            <input type="radio" class="btn-check" name="sh" value='{{x}}' v-model='sh' id="id_sh_{{x}}" autocomplete="off">
+            <label class="btn" for="id_sh_{{x}}">{{y}}</label>
+          {% endfor %}
+        </div>
+
+        <div class="mb-1">
+          <strong class="me-1">Год</strong>
+          {% for x,y in form.fields.yr.choices %}
+            <input type="radio" class="btn-check" name="yr" value='{{x}}' v-model='yr' id="id_yr_{{x}}" autocomplete="off">
+            <label class="btn" for="id_yr_{{x}}">{{y}}</label>
+          {% endfor %}
+        </div>
+
+        <div class="mb-1">
+          <strong class="me-1">Класс</strong>
+          {% for x,y in form.fields.gr.choices %}
+            <input type="radio" class="btn-check" name="gr" value='{{x}}' v-model='gr' id="id_gr_{{x}}" autocomplete="off">
+            <label class="btn" for="id_gr_{{x}}">{{y}}</label>
+          {% endfor %}
+        </div>
+
+        <div class="mb-1">
+          <strong class="me-1">Файлы</strong>
+          <template v-if='state==="uploading"'>
+            <span class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Загрузка...</span>
+            </span>
+            [[ que.length - todo.length ]] /
+          </template>
+          [[ que.length ]]
+
+          <div v-for='item in sorted' :key='item.key' class="d-flex mb-1 border-bottom">
+            <button v-if='item.status==="todo"' @click='removeItem(item)' class="btn btn-sm text-danger p-0 px-1 me-1">
+              <i class="bi bi-x-lg"></i>
+            </button>
+            <span v-else-if='item.status==="done"' class="p-0 px-1 me-1 btn btn-sm text-success">
+              <i class="bi bi-check-lg"></i>
+            </span>
+            <span v-else-if='item.status==="fail"' class="p-0 px-1 me-1 btn btn-sm text-warning" :title='item.err_msg||"не удалось загрузить файл"'>
+              <i class="bi bi-exclamation-triangle-fill"></i>
+            </span>
+            <span v-else-if='item.status==="uploading"' class="btn btn-sm text-primary p-0 px-1 me-1">
+              <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+              </div>
+            </span>
+            <span class="me-1" title="Съемка">[[ item.session ]]</span>
+            <span class="me-1" title="Школа и класс">[[ item.sh ]]_[[ item.yr ]][[ item.gr ]]</span>
+            <span class="ms-auto text-truncate" :title='item.name'>[[ item.name ]]</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button v-if='state==="standby"' @click='clear' type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal">Отмена</button>
+
+        <label>
+          <span id="id_select_files_btn" class="btn btn-success" :class='{"disabled": fileSelectDisabled}'>
+            <i class="bi bi-plus-lg"></i> Добавить файлы
+          </span>
+          <input @change='filesSelected' :disabled='fileSelectDisabled' class="d-none" type="file" accept="image/jpeg" multiple>
+        </label>
+
+        <button v-if='state==="standby"'
+          @click='startUploading'
+          :disabled='!canUpload'
+          type="button"
+          class="btn btn-primary"
+        >Загрузить</button>
+        <span v-else-if='state==="uploading"'>
+          <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+          </div>
+          [[ que.length - todo.length ]] / [[ que.length ]]
+        </span>
+      </div>
+    </Teleport>
+
+    <Teleport to="#id_modal_pricelists .modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Прайслисты</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        Прайсы
+        <button v-for='pl in pricelists' :key='pl[0]' @click='loadPricelist(pl)' :title='`${pl[1]} (${pl[0]})`'>[[ pl[1] ]]</button>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Формат</th>
+              <th v-for='theme in themes' :key='theme.ru' class="text-center">
+                <button @click='remTheme(theme)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
+                [[ theme.ru ]]
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr v-for='format in formats' :key='format.ru'>
+              <td>
+                <button @click='remFormat(format)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
+                [[ format.ru ]]
+                <span class="text-secondary">([[ format.price ]])</span>
+              </td>
+              <td v-for='theme in themes' :key='theme.ru' class="text-center">
+                <button v-if='theme.formats.includes(format.ru)' @click='remThemeFormat(theme, format.ru)' class="text-success btn btn-sm">
+                  <strong>да</strong>
+                </button>
+                <button v-else @click='addThemeFormat(theme, format.ru)' class="btn btn-sm text-secondary">
+                  нет
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div>
+          <input ref='formatName_input' type="text" @keydown.enter='$refs.formatValue_input.focus()' placeholder='формат'>
+          <input ref='formatValue_input' type="text" @keydown.enter='addFormat($refs.formatName_input.value, $refs.formatValue_input.value);$refs.formatName_input.focus();$refs.formatValue_input.value="";$refs.formatName_input.value=""' placeholder='цена'>
+          <button @click='addFormat($refs.formatName_input.value, $refs.formatValue_input.value);$refs.formatValue_input.value="";$refs.formatName_input.value=""'>+ формат</button>
+          <input ref='themeName_input' type="text" @keydown.enter='addTheme($refs.themeName_input.value);$refs.themeName_input.value=""' placeholder='тема'>
+          <button @click='addTheme($refs.themeName_input.value);$refs.themeName_input.value=""'>+ тема</button>
+        </div>
+
+        <div>
+          <button @click='loadPricelistPreset("Vipusk 2025")'>load 'Vipusk 2025'</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </Teleport>
+  </template>
+
   <script>
-    ;document.addEventListener('DOMContentLoaded', () => {
-      new ClipboardJS('.copylink')
+    const app = Vue.createApp({
+      template: '#id_vue_app',
+      setup(){
+        // upload que
+        const que = Vue.reactive([])
+        const ses = Vue.ref('')
+        const sh = Vue.ref('')
+        const yr = Vue.ref('')
+        const gr = Vue.ref('')
+        const state = Vue.ref("standby")
 
-      const form = document.querySelector('form#upload_form[method="POST"]')
+        const fileSelectDisabled = Vue.computed(() => !(ses.value && sh.value && yr.value && gr.value))
+        const todo = Vue.computed(() => que.filter(i=>i.status==='todo'))
+        const done = Vue.computed(() => que.filter(i=>i.status==='done'))
+        const sorted = Vue.computed(() => que.toSorted((a,b) => a.key > b.key || -1 ))
+        const canUpload = Vue.computed(() => state.value === 'standby' && todo.value.length)
 
-      const que = []
-      const que_todo = []
-      const que_done = []
+        const addItem = file => {
+          const key = `${ses.value}#${sh.value}#${yr.value}#${gr.value}#${file.name}`
+          const item = que.find(i => i.key === key)
+          if (item) {
+            item.file = file
+          } else {
+            que.push({
+              key,
+              session: ses.value,
+              sh: sh.value,
+              yr: yr.value,
+              gr: gr.value,
+              file,
+              name: file.name,
+              action: 'upload',
+              ajax: 'true',
+              csrfmiddlewaretoken: '{{ csrf_token }}',
+              status: 'todo',
+            })
+          }
+        }
 
-      form.addEventListener('submit', function(e) {
-        e.preventDefault()
-        const input_files = form.querySelector('input[type="file"][name="files"]')
-        const files = [...input_files.files]
-
-        input_files.value = ''
-        input_files.classList.add('d-none')
-
-        const data = {}
-        data.session = form.querySelector('select[name="session"]').value
-        data.sh = form.querySelector('input[name="sh"]').value
-        data.yr = form.querySelector('select[name="yr"]').value
-        data.gr = form.querySelector('select[name="gr"]').value
-
-        // hide upload btn
-        form.querySelector('button[value="upload"]').classList.add('d-none')
-        form.querySelector('span.spinner-border').classList.remove('d-none')
-        const done = form.querySelector('span#id_done')
-        done.classList.remove('d-none')
-
-        files.forEach(file => {
-          que_todo.push({
-            ...data,
-            files: file,
-            name: file.name,
-            action: 'upload',
-            ajax: 'true',
-            csrfmiddlewaretoken: '{{ csrf_token }}',
-          })
-        })
-
-        que_todo.forEach(i => que.push(i))
-
-        upload(que_todo.pop())
-
-        function upload(item) {
-          if (item === undefined) {
-            window.location.reload()
-            window.location.href = window.location.href
+        const upload = () => {
+          if (!todo.value.length) {
+            state.value = 'standby'
             return
           }
 
-          done.textContent = `${que.length - que_todo.length} / ${que.length}`
-
+          const item = todo.value[0]
+          item.status = 'uploading'
           const body = new FormData()
-
           Object.entries(item).forEach(([k, v]) => {
-            if (v instanceof Array) {
-              v.forEach(i=>body.append(k, i))
-            } else {
-              body.set(k, v)
-            }
+            body.set(k, v)
           })
 
-          fetch('{{ request.path }}', {
+          fetch('.', {
             method: 'POST',
             headers: {
-              'Accept': 'application/json',
+              //'Accept': 'application/json',
               //'Content-Type': 'multipart/form-data',
               'X-CSRFToken': '{{ csrf_token }}',
             },
             body,
             //signal: controller.signal,
           }).then(res => res.json()).then(res => {
-            que_done.push(item)
+            //que_done.push(item)
+            if (res.status === 'OK') {
+              item.status = 'done'
+            } else {
+              item.status = 'fail'
+              item.err_msg = res.err_msg
+            }
           }).catch(err => {
             console.log('[err]\n', err)
+            item.status = 'fail'
+            item.err_msg = `${err}`
           }).finally(() => {
-            upload(que_todo.pop())
-            //done.textContent = `${que_done.length} / ${que.length}`
+            upload()
           })
         }
-      })
 
-      document.querySelectorAll('#id_files').forEach(el => {
-        el.addEventListener('change', ev => {
-          document.querySelectorAll('#id_select_files_btn').forEach(btn => {
-            btn.textContent = el.files.length
-              ? `Выбрано файлов: ${el.files.length}`
-              : 'Выбрать файлы'
+
+        // pricelist
+        const pricelists = Vue.ref([{% for pl in prices %}[{{pl.id}}, '{{pl.name}}'],{% endfor %}])
+        const pricelist_presets = [
+          {
+            name: 'Vipusk 2025',
+            formats: [
+              {ru:'Фото 10х15', price:100},
+              {ru:'Фото 15х23', price:150},
+              {ru:'Book', price:1500},
+            ],
+            themes: [
+              {ru:'Портрет', formats:['Фото 10х15', 'Фото 15х23']},
+              {ru:'Vint', formats:['Фото 10х15', 'Фото 15х23', 'Book']},
+            ],
+          },
+        ]
+        const loadPricelist = (pl) => {
+          let price = pricelist_presets.find(p => p.name === pl[1])
+          if (price === undefined) {
+            fetch('.?pricelist='+pl[0]).then(x => x.json()).then(data => {
+              if (data.status === 'OK') {
+                pricelist_presets.push(data.pricelist)
+                loadPricelistPreset(pl[1])
+              }
+            })
+          } else {
+            loadPricelistPreset(pl[1])
+          }
+        }
+
+        const formats = Vue.reactive([])
+        const themes = Vue.reactive([])
+
+        const addFormat = (name, price) => {
+          formats.push({ru:name, price:price})
+          themes.forEach(theme => theme.formats.push(name))
+        }
+
+        const remFormat = format => {
+          themes.forEach(theme => {
+            const index = theme.formats.findIndex(f => f === format.ru)
+            if (~index) {
+              theme.formats.splice(index, 1)
+            }
           })
-        })
-      })
-    });
+          formats.splice(formats.findIndex(f => f == format), 1)
+        }
+
+        const addTheme = (name, fmts) => {
+          themes.push({ru:name, formats:fmts || formats.map(f=>f.ru)})
+        }
+
+        const remTheme = theme => {
+          themes.splice(themes.findIndex(th => th == theme), 1)
+        }
+
+        const addThemeFormat = (theme, formatName) => {
+          theme.formats.push(formatName)
+        }
+
+        const remThemeFormat = (theme, formatName) => {
+          theme.formats.splice(theme.formats.findIndex(f => f === formatName), 1)
+        }
+
+        const loadPricelistPreset = (name) => {
+          themes.splice(0)
+          formats.splice(0)
+          const preset = pricelist_presets.find(p => p.name === name)
+          preset.formats.forEach(f => addFormat(f.ru, f.price))
+          preset.themes.forEach(th => addTheme(th.ru, th.formats))
+        }
+
+        return {
+          // upload que
+          sorted,
+          que, ses, sh, yr, gr,
+          todo, state,
+          fileSelectDisabled, canUpload,
+          removeItem(item) {que.splice(que.findIndex(i=>i===item), 1)},
+          filesSelected(e) {
+            [...e.target.files].forEach(addItem)
+            e.target.value = ''
+          },
+          startUploading() {
+            state.value = 'uploading'
+            upload()
+          },
+          clear() {que.splice(0)},
+
+          // pricelist
+          formats,
+          addFormat, remFormat,
+          themes,
+          addTheme, remTheme, addThemeFormat, remThemeFormat,
+          loadPricelistPreset,
+          pricelists, loadPricelist,
+        }
+      }
+    })
+    app.config.compilerOptions.delimiters = ['[[', ']]']
+    const vm = app.mount('#id_mount')
   </script>
 {% endblock js %}

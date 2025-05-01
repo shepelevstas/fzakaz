@@ -19,7 +19,7 @@ from utils.money import order_cost
 from .forms import ContactInfoForm, UploadBlanksForm
 from .album import Album
 
-from .models import Session, Order
+from .models import Session, Order, Pricelist
 
 
 signer = Signer()
@@ -35,6 +35,65 @@ def signed_view(request, sign):
     return HttpResponse('Код неверный'.encode())
 
   return zakaz(request, session, sh, year, group)
+
+
+def blanks(req, sign):
+  from .models import Album
+  try:
+    unsigned = signer.unsign(sign)
+    ses, _, alb = unsigned.partition('__')
+    ses_yr, _, ses_nm = ses.partition('_')
+    sh, _, cls = alb.partition('_')
+    yr = cls[:-1]
+    gr = cls[-1]
+    ses = Session.objects.select_related('pricelist').get(year=ses_yr, name=ses_nm)
+    alb = Album.objects.prefetch_related('order_set').get(session=ses, sh=sh, shyear=yr, group=gr)
+  except BadSignature:
+    return HttpResponse('Код неверный'.encode())
+
+  orders = alb.order_set.filter(deleted=None)
+  style = next(iter(ses.pricelist.themes.values()))['blank_img_style']
+
+  return render(req, 'blanks.html', {
+    'album': alb,
+    'orders': orders,
+    'blank_img_style': style,
+  })
+
+
+def order(req, sign, id):
+  from .models import Album
+
+  try:
+    unsigned = signer.unsign(sign)
+    ses, _, alb_ord = unsigned.partition('__')
+    ses_yr, _, ses_nm = ses.partition('_')
+    alb, _, ord = alb_ord.partition('__')
+    sh, _, cls = alb.partition('_')
+    yr = cls[:-1]
+    gr = cls[-1]
+    order = Order.objects.select_related('album__session__pricelist').get(
+      id=id,
+      imgname=ord,
+      album__sh=sh,
+      album__shyear=yr,
+      album__group=gr,
+      album__session__year=ses_yr,
+      album__session__name=ses_nm,
+    )
+
+  except (BadSignature, Order.DoesNotExist):
+    return HttpResponse('Код неверный')
+
+  contacts = ContactInfoForm(req.POST or order.json or None)
+
+  return render(req, "order.html", {
+    'order': order,
+    "contacts": contacts,
+  })
+
+
+
 
 
 def zakaz(request, session=None, sh=None, shyear=None, group=None, uuid=None, imgn=None):
@@ -147,19 +206,14 @@ def upload(request):
     ALBUM = settings.MEDIA_ROOT / 'blanks' / ses / sh / f'{yr}{gr}'
     ALBUM.mkdir(parents=True, exist_ok=True)
 
-    existing_file_dirs = {}
-    for file_dir in ALBUM.iterdir():
-      if not file_dir.is_dir():continue
-      for f in file_dir.iterdir():
-        existing_file_dirs[f.name] = [file_dir, f]
+    existing_file_dirs = {
+      f.name: f.parent
+      for f in ALBUM.glob('**/*.jpg')
+    }
 
     for file in request.FILES.getlist('files'):
-      exist_file_dir, exist_trg_file = existing_file_dirs.get(file.name) or [None, None]
-      if exist_file_dir:
-        file_dir = exist_file_dir
-      else:
-        file_dir = ALBUM / str(uuid4())
-        file_dir.mkdir()
+      file_dir = existing_file_dirs.get(file.name) or ALBUM / str(uuid4())
+      file_dir.mkdir(exist_ok=True)
       trg_file = file_dir / file.name
       if trg_file.exists():
         trg_file.unlink()
@@ -174,6 +228,48 @@ def upload(request):
 
 def manage_albums(req, edit=True):
   from .models import Album
+
+  if req.POST.get('action') == 'upload':
+    form = UploadBlanksForm(req.POST, req.FILES)
+    if form.is_valid():
+      ses_yr, _, ses_name = form.cleaned_data['session'].partition('_')
+      sh = form.cleaned_data["sh"].upper()
+      yr = form.cleaned_data["yr"]
+      gr = form.cleaned_data["gr"][0].lower().translate(ru).upper()
+      ses = Session.objects.get(year=ses_yr, name=ses_name)
+      alb, alb_is_new = Album.objects.get_or_create(session=ses, sh=sh, shyear=yr, group=gr)
+
+      for file in req.FILES.getlist('file'):
+        ord, ord_is_new = Order.objects.get_or_create(
+          album=alb,
+          imgname=file.name.rsplit('.', 1)[-2],
+          defaults={
+            'blank': file,
+          },
+        )
+        if not ord_is_new:
+          ord.blank = file
+          ord.save()
+
+      if req.POST.get('ajax') == 'true':
+        return JsonResponse({'album': alb.get_json(), 'status': 'OK'})
+
+    return JsonResponse({
+      'status': 'FAIL',
+      'msg': f'{form.errors}',
+    })
+
+  if req.method == 'GET' and req.GET.get('pricelist'):
+    pricelist = Pricelist.objects.get(id=req.GET['pricelist'])
+    return JsonResponse({
+      'status': 'OK',
+      'pricelist': {
+        'name': pricelist.name,
+        'formats': [f for k,f in pricelist.formats.items()],
+        'themes': [{**th, 'formats': [pricelist.formats[f]['ru'] for f in th['formats']]} for k,th in pricelist.themes.items()],
+      },
+    })
+
   albums = Album.objects.select_related('session')
   ses = req.GET.get('ses')
   sh = req.GET.get('sh')
@@ -187,6 +283,7 @@ def manage_albums(req, edit=True):
     'albums': albums,
     'form': UploadBlanksForm(),
     'edit': edit,
+    'prices': Pricelist.objects.filter(deleted=None).only('name'),
   })
 
 

@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+
+{% load mytags %}
+
+{% block title %}fZ - {{order}}{% endblock title %}
+
+
+{% block js %}
+  <script>
+		const sum = list => list.reduce((a, b) => a + b, 0)
+		function map(fn,list){
+			if (list===void 0)
+				return function(list){return map(fn, list)}
+			var l = list.length
+			if (l===0) return []
+			var res = Array(l)
+			for (var i=0;i<l;i++)
+				res[i] = fn(list[i], i, list)
+			return res
+		}
+    const compose = f => g => a => f(g(a))
+    const pipe = (...args) => fold(_pipe, args[0], tail(args))
+    const pipe2 = f => g => a => g(f(a))
+    const _pipe = (f,g) => (...args) => g.call(null, f.apply(null, args))
+    function fold(fn, acc, list){
+			if (list===void 0)
+				return list => fold(fn, acc, list)
+			for (var i = 0, l = list.length; i<l; i++)
+				acc = fn(acc, list[i], i, list)
+			return acc
+    }
+    const tail = list => drop(1, list)
+    function drop(n,list){
+			if (list===void 0)
+				return list => drop(n, list)
+			if (Array.isArray(list))
+				return list.slice(n)
+			if (isArrayLike(list)){
+				var res = [], i = n<0?list.length-n:n, l = list.length
+				while (i<l) res.push(list[i++])
+					return res
+			}
+    }
+    function isArrayLike(a){return a!=null&&typeof(a)=="object"&&a.length>=0}
+    const product = ([a,b]) => a * b
+    const apply = a => f => f(a)
+    const flip = f => b => a => f(a,b)
+		// : [a->b] -> a -> [b]
+		const applyFuncs = pipe(flip(map), pipe2(apply))
+
+
+    ;document.addEventListener('DOMContentLoaded', () => {
+
+			const inputs = document.querySelectorAll('input[type=number][data-price]')
+			const totals = document.querySelectorAll('.total_sum')
+			const subm_btn = document.querySelector('button#submit_btn')
+			const cancel_btns = document.querySelectorAll('button[value="cancel_order"]')
+			const order_form = document.querySelector('form#order_form')
+			const form_subm = document.querySelector('button#form_subm_btn')
+			const eport0 = document.querySelectorAll('.eport0')
+			const eport1 = document.querySelectorAll('.eport1')
+
+			const btns_plus = document.querySelectorAll('button[data-plus]')
+			const btns_minus = document.querySelectorAll('button[data-minus]')
+
+			//function calc() {
+			//  return Array.from(inputs).reduce((m,i)=>
+			//    m + parseInt(i.value || 0) * parseFloat(i.dataset.price)
+			//  ,0)
+			//}
+
+			// f : a -> b
+			// map : (a->b) -> [a] -> [b]
+			// flip : (a->b->c) -> b -> a -> c
+			// flip(map) : [a] -> (a->b) -> [b]
+			// apply : a -> f -> b
+
+			// ? : [f] -> a -> [b]
+			// pipe(apply, flip(map)([f, f]))
+			// flip(map) ([f, f]) (apply(a))
+			// ? : [a -> b] -> a -> [b]
+			// const f = ff => pipe(apply, flip(map)(ff))
+			// compose : (b -> c) -> (a -> b) -> a -> c
+			// pipe(flip(map), compose(apply))
+			// ? : (a->b) -> (b->c) -> a -> c
+
+
+			const calc = () => pipe(
+				Array.from,
+				/// 1
+				// map(i => parseInt(i.value||0) * parseFloat(i.dataset.price)),
+				/// 2
+				//map(pipe(
+				//  apply,
+				//  flip(map)([i=>parseInt(i.value||0), i=>parseFloat(i.dataset.price)]),
+				//  product,
+				//)),
+				/// 3
+				map(pipe(
+					applyFuncs([i=>parseInt(i.value||0), i=>parseFloat(i.dataset.price)]),
+					product,
+				)),
+				sum,
+			)(inputs)
+
+			function calcSum(e) {
+				const sum = calc()
+				totals.forEach(i=>i.textContent=sum)
+				if (sum >= {{order.album.session.pricelist.bonus.sum}}) {
+					eport0.forEach(i=>i.classList.add('d-none'))
+					eport1.forEach(i=>i.classList.remove('d-none'))
+				} else {
+					eport0.forEach(i=>i.classList.remove('d-none'))
+					eport1.forEach(i=>i.classList.add('d-none'))
+				}
+				return sum
+			}
+
+			inputs.forEach(input=>input.addEventListener('change', calcSum))
+
+			function plus_click(e) {
+				e.preventDefault()
+
+				{% if not order.album.closed %}
+				const name = e.target.dataset.name
+				const input = document.querySelector(`input[type=number][name="${name}"]`)
+				const new_value = (Number(input.value)||0)+1
+				input.value = new_value
+
+				document.querySelectorAll(`span[data-name="${name}"]`).forEach(span => {
+					const wrap = span.closest('span.d-flex')
+					span.textContent = new_value
+					if (wrap) {
+						wrap.classList.remove('d-none')
+					}
+				})
+
+				calcSum(e)
+				{% endif %}
+			}
+
+			function minus_click(e) {
+				e.preventDefault()
+
+				{% if not album.closed %}
+				const name = e.target.dataset.name
+				const input = document.querySelector(`input[type=number][name="${name}"]`)
+				const new_value = Math.max((Number(input.value)||0)-1, 0)
+				input.value = new_value
+
+				const span = document.querySelector(`span[data-name="${name}"]`)
+				if (span) {span.textContent = input.value}
+
+				document.querySelectorAll(`span[data-name="${name}"]`).forEach(span => {
+					const wrap = span.closest('span.d-flex')
+					span.textContent = new_value
+					if (wrap && new_value < 1) {
+						wrap.classList.add('d-none')
+					}
+				})
+
+				calcSum(e)
+				{% endif %}
+			}
+
+			btns_plus.forEach(btn=>btn.addEventListener('click', plus_click))
+			btns_minus.forEach(btn=>btn.addEventListener('click', minus_click))
+
+			//if (calcSum()) {
+			//  cancel_btns.forEach(el => el.classList.remove('d-none'))
+			//}
+			calcSum()
+
+			const inputs_arr = Array.from(inputs)
+
+			order_form.addEventListener('submit', (e) => {
+				const sum = calc()
+				if (sum <= 0) {
+					e.preventDefault()
+					alert('Ничего не заказано')
+				} else if (inputs_arr.filter(i=>i.name.endsWith('_tshirt') && i.value != '0').length && !inputs_arr.filter(i=>i.name.endsWith('_tsize') && i.value != '0').length) {
+					e.preventDefault()
+					const index = inputs_arr.findIndex(i=>i.name.endsWith('_tshirt') && i.value != '0')
+					const input = inputs_arr.slice(index).find(i=>i.name.endsWith('_tsize'))
+					alert('Заказывая футболку - укажите размер!')
+					setTimeout(()=>{
+						input.scrollIntoView()
+						input.focus()
+					}, 0)
+				}
+			})
+
+			const errorlist = document.querySelector('ul.errorlist')
+			if (errorlist) {errorlist.scrollIntoView()}
+
+    });
+  </script>
+{% endblock js %}
+
+
+{% block content %}
+	<div class="sticky-top bg-white shadow">
+		<div class="py-2 d-flex align-items-center container-fluid">
+			<h5 class="mb-0 me-2">{% if order.album.closed %}<strong class="text-danger-emphasis">ПРИЕМ ЗАКАЗОВ ЗАКРЫТ</strong>{% else %}Заказ фотопродукции{% endif %}</h5>
+
+			<span class="d-flex align-items-center ms-auto">
+				<strong class="total_sum me-1 fs-3">0</strong>
+				<strong class="text-secondary me-2">руб</strong>
+				{% if not album.closed %}
+					<button id="submit_btn" name="action" value="save" form="order_form" class="btn btn-outline-success">Сохранить заказ</button>
+
+					{% if order.ordered %}
+						<button class="btn btn-outline danger ms-2" name="action" value="cancel_order" form="order_form">Отменить</button>
+					{% endif %}
+				{% endif %}
+			</span>
+		</div>
+
+		<div class="d-none d-md-block">
+			<div class="d-none eport0 bg-primary text-light p-2 text-center">{{ order.album.session.pricelist.bonus.text }}</div>
+			<div class="d-none eport1 bg-success text-light p-2 text-center">{{ order.album.session.pricelist.bonus.success }}</div>
+		</div>
+	</div>
+
+	<div class="d-block d-md-none">
+		<div class="d-none eport0 bg-primary text-light p-2 text-center">{{ order.album.session.pricelist.bonus.text }}</div>
+		<div class="d-none eport1 bg-success text-light p-2 text-center">{{ order.album.session.pricelist.bonus.success }}</div>
+	</div>
+
+
+
+	<div class="container-fluid py-4">
+		<form action="." method="post" id="order_form">
+			{% csrf_token %}
+
+			<div class="row">
+			{% with formats=order.album.session.pricelist.formats %}
+				{% for thm, theme in order.album.session.pricelist.themes.items %}
+					<div class="col-12 col-md-6 col-lg-3">
+
+						<div class="card shadow mb-4">
+							<div class="card-img-top" style="background-image:url({{order.blank.url}});{{theme.blank_img_style}}"></div>
+							<div class="card-body">
+								<h5 class="card-title">
+									<strong>{{ theme.ru }}</strong>
+								</h5>
+
+								{% for fmt in theme.formats %}
+								{% with format=formats|lookup:fmt k=thm|add:'_'|add:fmt %}
+									<div class="card-text border-top d-flex align-items-center">
+										<span class="me-2">{{ format.ru }}</span>
+
+
+										{% if fmt == 'tsize' %}
+											<span class="ms-auto me-2 text-secondary">см</span>
+
+											<input type="number" min="0" max="56" class="text-center form-control my-1 fs-5" name="{{k}}" value="{{order.json|lookup:k|default:'0'}}" data-price="{{format.price}}" style="width:6em;">
+										{% else %}
+
+										<span class="ms-auto me-2 fs-4">{{ format.price }}<span class="text-secondary">₽</span></span>
+
+
+										{% comment %} <div class="input-group input-group-sm flex-nowrap w-auto my-2">
+											<button class="btn btn-outline-primary" data-name="{{k}}" data-minus="1"><i class="bi bi-dash-lg" data-name="{{k}}"></i></button>
+
+											<input
+												name="{{k}}"
+												type="number"
+												min="0"
+												class="d-none"
+												value="{{order.json|lookup:k|default:'0'}}"
+												data-price="{{format.price}}">
+
+											<span class="input-group-text fw-bold" data-name="{{k}}">{{order.json|lookup:k|default:'0'}}</span>
+
+											<button class="btn btn-outline-primary" data-name="{{k}}" data-plus="1"><i class="bi bi-plus-lg" data-name="{{k}}"></i></button>
+										</div> {% endcomment %}
+
+										<input
+											name="{{k}}"
+											type="number"
+											min="0"
+											class="d-none"
+											value="{{order.json|lookup:k|default:'0'}}"
+											data-price="{{format.price}}">
+
+										<span class="d-none me-2 d-flex align-items-center">
+											<span class="me-1 fs-4">x</span>
+
+											<span class="fw-bold me-2 fs-2" data-name="{{k}}">{{order.json|lookup:k|default:'0'}}</span>
+
+											<button class="btn btn-sm btn-outline-danger" data-name="{{k}}" data-minus="1">
+												<i class="bi bi-dash-lg" data-name="{{k}}"></i>
+											</button>
+
+										</span>
+
+
+
+										<button class="btn btn-outline-primary my-2 text-nowrap" data-name="{{k}}" data-plus>
+											<i class="bi bi-plus-lg" data-name="{{k}}"></i>
+											<b class="d-none d-sm-inline" data-name="{{k}}">1</b>
+										</button>
+										{% endif %}
+									</div>
+								{% endwith %}
+								{% endfor %}
+
+							</div>
+						</div>
+
+					</div>
+				{% endfor %}
+			{% endwith %}
+			</div>
+
+			<div class="row justify-content-center mb-3">
+				{% for field in contacts %}
+					<div class="mb-2 col-12 col-md-4 col-xl-3{% if field.errors %} error{% endif %}">
+						{{field}}
+						{{field.errors}}
+					</div>
+				{% endfor %}
+			</div>
+
+			<div class="d-block d-md-none mb-4">
+				<div class="d-none eport0 bg-primary text-light p-2 text-center rounded">{{ order.album.session.pricelist.bonus.text }}</div>
+				<div class="d-none eport1 bg-success text-light p-2 text-center rounded">{{ order.album.session.pricelist.bonus.success }}</div>
+			</div>
+
+			<div class="row">
+				<div class="col-12 d-flex align-items-center justify-content-center">
+					<div class="">
+						<strong class="total_sum fs-3">0</strong>
+						<strong class="text-secondary me-2">руб</strong>
+					</div>
+					{% if not album.is_closed %}
+						<button id="form_subm_btn" name="action" value="save" class="btn btn-outline-success">
+							Сохранить заказ
+						</button>
+						{% if album.is_ordered %}
+							<button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+								Отменить
+							</button>
+						{% endif %}
+					{% endif %}
+				</div>
+			</div>
+
+		</form>
+	</div>
+{% endblock content %}
+
+
+{% block css %}
+  <style>
+    .error > input.form-control {
+      --bs-border-opacity: 1;
+      border-color: rgba(var(--bs-danger-rgb),var(--bs-border-opacity))!important;
+    }
+
+    .error > ul.errorlist > li {
+      --bs-text-opacity: 1;
+      color: rgba(var(--bs-danger-rgb),var(--bs-text-opacity))!important;
+    }
+  </style>
+{% endblock css %}

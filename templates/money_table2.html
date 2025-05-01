@@ -22,6 +22,10 @@
 {% endblock topbar_content %}
 
 {% block container %}
+  <code class="d-none">
+    {{album.get_money_table}}
+  </code>
+
   <div class="row">
     <div class="col">
       <table class="table table-striped d-block overflow-scroll mw-100 border-start border-end">

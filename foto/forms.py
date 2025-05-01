@@ -1,5 +1,6 @@
 from django import forms
-from django.conf import settings
+
+from .models import Session, Album
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -56,22 +57,16 @@ class ContactInfoForm(forms.Form):
 
 class UploadBlanksForm(forms.Form):
   # session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
-  session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(i.name, i.name) for i in (settings.MEDIA_ROOT / 'blanks').iterdir() if i.is_dir()])
-  sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
-  # yr = forms.CharField(label='YR', required=True)
+  # session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(i.name, i.name) for i in (settings.MEDIA_ROOT / 'blanks').iterdir() if i.is_dir()])
+  session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(str(s), str(s)) for s in Session.objects.filter(deleted=None)])
+  # sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
+  sh = forms.ChoiceField(label='SH', required=True, widget=forms.Select(attrs={'class': 'form-control w-auto'}), choices=[(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))])
   yr = forms.ChoiceField(label="Год", required=True, choices=[
     (i,i) for i in range(1,12)
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
-  # gr = forms.CharField(label='GR', required=True)
   gr = forms.ChoiceField(label="Класс", required=True, choices=[
     (i, i) for i in 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ'
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
-  #files = forms.FileField(widget=forms.FileInput(attrs={'multiple': True, 'accept':'image/jpeg'}), required=True)
   files = MultipleFileField(required=True, label="Файлы", attrs={'accept': 'image/jpeg', 'style': 'width:0'})
-
-  # class Meta:
-  #   widgets = {
-  #     "session": forms.TextInput(attrs={"class": "form-control"})
-  #   }
 
 

@@ -640,23 +640,21 @@ class Album:
       file = Path(file)
     return datetime.fromtimestamp(file.stat().st_mtime).astimezone(zone)
 
+  def get_order_time(self, uuid=None):
+    uuid = uuid or self.uuid
+    assert uuid
+    order_file = self.get_order_file(uuid=uuid)
+    if not order_file: return None
+    order_data = read_order(order_file, format=self.order_format)
+    date = order_data.get('date')
+    if date:
+      return datetime.fromisoformat(date)
+    return self.file_mtime_as_datetime(order_file)
+
   @property
   @lru_cache
   def last_order_time(self):
-    res = None
-    for f in self.blanks_dir.iterdir():
-      if not f.is_dir(): continue
-      json = self.get_order_file(uuid=f.name)
-      if not json: continue
-      data = read_order(json, format=self.order_format)
-      date = data.get('date')
-      if date:
-        date = datetime.fromisoformat(date)
-      else:
-        # date = datetime.fromtimestamp(json.stat().st_mtime).astimezone(zone)
-        date = self.file_mtime_as_datetime(json)
-      res = date if res is None else max(res, date)
-    return res
+    return max(self.get_order_time(uuid=f.name) or 0 for f in self.blanks_dir.iterdir()) or None
 
   @lru_cache
   def get_blank_file(self, uuid=None):
@@ -712,10 +710,12 @@ class Album:
     uuid = uuid or self.uuid
     assert uuid, 'no uuid in album.get_order'
     order_file = self.get_order_file(uuid)
+    print(f'[get_order] {order_file=}')
     if not order_file:
       return None
     return read_order(order_file, format=self.order_format)
 
+  # NOT USED
   @staticmethod
   def normalize_order(data, uuid, json_file):
     '''
@@ -730,7 +730,7 @@ class Album:
     '''
     res = {'items': {}, 'uuid': uuid}
 
-    for k,v in date.items():
+    for k,v in data.items():
       if '_' in k:
         if isinstance(v, str) and not v.isdecimal():
           continue
@@ -939,15 +939,25 @@ class Album:
       rows[img] = row
 
       for item, q in b.items():
-        if '_' not in item: continue
-        if not q: continue
-        col_k, row_k = item.split('_')
+        if '_' not in item:
+          print(f'[get_money_table] no "_" in order item, skipped: "{item=}"')
+          continue
+        if not q:
+          print(f'[get_money_table] no q: "{q=}"')
+          continue
+        # col_k, row_k = item.split('_')
+        col_k, _, row_k = item.partition('_')
         if row_k == 'tsize':
+          print(f'[get_money_table] is tsize: {item=}')
           row['tsize'] = q
           continue
-        if col_k not in pricelist: continue
+        if col_k not in pricelist:
+          print(f'[get_money_table] "{col_k=}" not in pricelist')
+          continue
         col_data = pricelist[col_k]
-        if row_k not in col_data['amounts']: continue
+        if row_k not in col_data['amounts']:
+          print(f'[get_money_table] "{row_k=}" not in col_data["amounts"]')
+          continue
         row_data = col_data['amounts'][row_k]
         price = row_data["price"]
         col = cols.setdefault(item, {

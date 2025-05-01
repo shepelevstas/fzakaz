@@ -6,16 +6,15 @@ from django.conf.urls.static import static
 from foto import views
 
 urlpatterns = [
+    path('', include('foto.urls')),
+
     path('zakaz/<str:session>__<str:sh>_<int:shyear><str:group>/<uuid:uuid>/', views.zakaz, name='zakaz'),
 
-    # path('<str:session>__<str:sh>_<int:year><str:group>:<str:code>/', views.signed_view, name="signed_view"),
     path('blanks/<str:sign>/', views.signed_view, name="signed_view"),
 
     # http://83.220.168.4/4_1%D0%90:agBVmO1xRZTnMNNwoXg8UBidjXaAv8MSLV0TsdV_gmA/
-    # path('upload_blanks/7f094d61-bb45-4375-81fe-32fcbb383d5c/', views.upload_blanks, name='upload_blanks'),
 
     path('manage_blanks/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_blanks, name='manage_blanks'),
-    path('manage_albums/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_albums, name='manage_blanks'),
 
     path('orders/3528ca60-28b5-49d1-8574-66897823a017/', views.orders, name='orders'),
 
@@ -32,13 +31,9 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += [
-        # kadr
-        path('kadr/', include('kadr.urls')),
-
-        path('work/', include('work.urls')),
-
-        # path('play/', views.play, name='play'),
-        path('play/', include('play.urls')),
-    ]
+    # urlpatterns += [
+    #     path('kadr/', include('kadr.urls')),
+    #     path('work/', include('work.urls')),
+    #     path('play/', include('play.urls')),
+    # ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
