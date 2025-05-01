@@ -919,6 +919,9 @@ class Album:
     }
 
     pricelist = self.get_empty_goods()
+    pl = self.get_pricelist()
+    themes = pl.get_themes()
+    formats = pl.get_formats()
 
     cols = {}
     rows = {}
@@ -942,30 +945,48 @@ class Album:
         if '_' not in item:
           print(f'[get_money_table] no "_" in order item, skipped: "{item=}"')
           continue
+
         if not q:
           print(f'[get_money_table] no q: "{q=}"')
           continue
+
         # col_k, row_k = item.split('_')
         col_k, _, row_k = item.partition('_')
+
         if row_k == 'tsize':
           print(f'[get_money_table] is tsize: {item=}')
           row['tsize'] = q
           continue
-        if col_k not in pricelist:
-          print(f'[get_money_table] "{col_k=}" not in pricelist')
+
+        # if col_k not in pricelist:
+        #   print(f'[get_money_table] "{col_k=}" not in pricelist')
+        #   continue
+
+        if col_k not in themes:
+          print(f'[get_money_table] "{col_k=}" not in themes')
           continue
-        col_data = pricelist[col_k]
-        if row_k not in col_data['amounts']:
-          print(f'[get_money_table] "{row_k=}" not in col_data["amounts"]')
+
+        # col_data = pricelist[col_k]
+
+        # if row_k not in col_data['amounts']:
+        #   print(f'[get_money_table] "{row_k=}" not in col_data["amounts"]')
+        #   continue
+
+        if row_k not in formats:
+          print(f'[get_money_table] "{row_k}" not in formats')
           continue
-        row_data = col_data['amounts'][row_k]
-        price = row_data["price"]
+
+        # row_data = col_data['amounts'][row_k]
+        # price = row_data["price"]
+        price = formats[row_k]['price']
         col = cols.setdefault(item, {
           'q': 0,
           'theme_k': col_k,
-          'theme': col_data['title'],
+          # 'theme': col_data['title'],
+          'theme': themes[col_k]['ru'],
           'format_k': row_k,
-          'format': row_data['title'],
+          # 'format': row_data['title'],
+          'format': formats[row_k]['ru'],
           'price': price,
         })
         q = int(q)
