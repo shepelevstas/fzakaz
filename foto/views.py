@@ -196,7 +196,7 @@ def load_album(ALBUM):
 
 
 def upload(request):
-  form = UploadBlanksForm(request.POST, request.FILES)
+  form = UploadBlanksForm(request.POST, request.FILES, old=True)
   if form.is_valid():
     ses = form.cleaned_data['session']
     sh = form.cleaned_data['sh'].upper()
@@ -263,11 +263,12 @@ def manage_albums(req, edit=True):
     pricelist = Pricelist.objects.get(id=req.GET['pricelist'])
     return JsonResponse({
       'status': 'OK',
-      'pricelist': {
-        'name': pricelist.name,
-        'formats': [f for k,f in pricelist.formats.items()],
-        'themes': [{**th, 'formats': [pricelist.formats[f]['ru'] for f in th['formats']]} for k,th in pricelist.themes.items()],
-      },
+      # 'pricelist': {
+      #   'name': pricelist.name,
+      #   'formats': [f for k,f in pricelist.formats.items()],
+      #   'themes': [{**th, 'formats': [pricelist.formats[f]['ru'] for f in th['formats']]} for k,th in pricelist.themes.items()],
+      # },
+      'pricelist': pricelist.as_json(),
     })
 
   albums = Album.objects.select_related('session')
@@ -311,8 +312,10 @@ def manage_blanks(request, edit=True):
   ses = request.GET.get('ses')
   sh = request.GET.get('sh')
 
+  form = UploadBlanksForm(old=True)
+
   return render(request, 'manage_blanks.html', {
-    'form': UploadBlanksForm(),
+    'form': form,
     'edit': edit,
     'albums': Album.get_albums(ses, sh),
   })

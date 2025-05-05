@@ -105,6 +105,22 @@ class Pricelist(models.Model):
   '''
   bonus = models.JSONField()
 
+  def as_json(self):
+    '''
+      {
+        'name': pricelist.name,
+        'formats': [f for k,f in pricelist.formats.items()],
+        'themes': [{**th, 'formats': [pricelist.formats[f]['ru'] for f in th['formats']]} for k,th in pricelist.themes.items()],
+      }
+    '''
+
+    return {
+      'id': self.id,
+      'name': self.name,
+      'formats': [{'key': k, **f} for k, f in self.formats.items()],
+      'themes': [{'key': k, **th} for k, th in self.themes.items()],
+    }
+
 
 class Session(models.Model):
   created = models.DateTimeField(auto_now_add=True)

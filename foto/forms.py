@@ -71,7 +71,17 @@ class UploadBlanksForm(forms.Form):
 
   def __init__(self, *args, **kwargs):
     super(UploadBlanksForm, self).__init__(*args, **kwargs)
-    self.fields['session'].choices = [(str(s), str(s)) for s in Session.objects.filter(deleted=None)]
-    self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
+
+    if kwargs.get('old') == True:
+      self.fields['session'].choices = [
+        (i.name, i.name)
+        for i in (settings.MEDIA_ROOT / 'blanks').iterdir()
+        if i.is_dir()
+      ]
+      self.fields['sh'].choices = [('18', '18'), ('90', '90')]
+
+    else:
+      self.fields['session'].choices = [(str(s), str(s)) for s in Session.objects.filter(deleted=None)]
+      self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
 
 

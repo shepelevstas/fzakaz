@@ -162,7 +162,7 @@
   </div>
 
   <div class="modal fade" tabindex="-1" id="id_modal_pricelists">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-fullscreen-lg-down modal-xl">
       <div class="modal-content shadow"></div>
     </div>
   </div>
@@ -277,6 +277,7 @@
       </div>
     </Teleport>
 
+    {# PRICELISTS #}
     <Teleport to="#id_modal_pricelists .modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Прайслисты</h5>
@@ -285,13 +286,35 @@
 
       <div class="modal-body">
         Прайсы
-        <button v-for='pl in pricelists' :key='pl[0]' @click='loadPricelist(pl)' :title='`${pl[1]} (${pl[0]})`'>[[ pl[1] ]]</button>
+
+        <button v-for='pl in pricelists' :key='pl.id' @click='loadPricelist(pl)' :title='`${pl.name} (${pl.id})`' class="btn btn-sm btn-primary">
+          <span :class='{"fw-bold": loadedPrice == pl}'>[[ pl.name ]]</span>
+        </button>
+
+        <div class="input-group input-group-sm d-inline-flex w-auto">
+          <input type="text" class="form-control" placeholder="добавить прайс" ref="new_price_name">
+          <button @click='addPrice' class="btn btn-outline-success"><i class="bi bi-plus-lg"></i></button>
+        </div>
 
         <table class="table">
           <thead>
             <tr>
-              <th>Формат</th>
-              <th v-for='theme in themes' :key='theme.ru' class="text-center">
+              <th :colspan='1 + themes.length' class="text-end border-0">
+                <div class="input-group input-group-sm d-inline-flex w-auto">
+                  <input ref='themeName_input' type="text" @keydown.enter='addTheme({ru:$refs.themeName_input.value});$refs.themeName_input.value=""' placeholder='тема' class="form-control">
+                  <button @click='addTheme({ru:$refs.themeName_input.value});$refs.themeName_input.value=""' class="btn btn-outline-success">+ тема</button>
+                </div>
+              </th>
+            </tr>
+
+            <tr>
+              <th>
+                <span>
+                  Формат
+                </span>
+              </th>
+
+              <th v-for='theme in themes' :key='theme.key' class="text-center">
                 <button @click='remTheme(theme)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
                 [[ theme.ru ]]
               </th>
@@ -299,34 +322,42 @@
           </thead>
 
           <tbody>
-            <tr v-for='format in formats' :key='format.ru'>
+            <tr v-for='format in formats' :key='format.key'>
               <td>
                 <button @click='remFormat(format)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
                 [[ format.ru ]]
                 <span class="text-secondary">([[ format.price ]])</span>
               </td>
-              <td v-for='theme in themes' :key='theme.ru' class="text-center">
-                <button v-if='theme.formats.includes(format.ru)' @click='remThemeFormat(theme, format.ru)' class="text-success btn btn-sm">
+              <td v-for='theme in themes' :key='theme.key' class="text-center">
+                <button v-if='theme.formats.includes(format.key)' @click='remThemeFormat(theme, format.key)' class="text-success btn btn-sm">
                   <strong>да</strong>
                 </button>
-                <button v-else @click='addThemeFormat(theme, format.ru)' class="btn btn-sm text-secondary">
+                <button v-else @click='addThemeFormat(theme, format.key)' class="btn btn-sm text-secondary">
                   нет
                 </button>
+              </td>
+            </tr>
+
+            <tr>
+              <td :colspan='1 + themes.length' class="border-0">
+
+                <div class="input-group input-group-sm d-inline-flex w-auto">
+                  <input ref='formatName_input' type="text" @keydown.enter='$refs.formatValue_input.focus()' placeholder='формат' class="form-control">
+
+                  <input ref='formatValue_input' type="text" @keydown.enter='addFormat({ru:$refs.formatName_input.value, price:$refs.formatValue_input.value});$refs.formatName_input.focus();$refs.formatValue_input.value="";$refs.formatName_input.value=""' placeholder='цена' class="form-control">
+
+                  <button @click='addFormat({ru:$refs.formatName_input.value, price:$refs.formatValue_input.value});$refs.formatValue_input.value="";$refs.formatName_input.value=""' class="btn btn-outline-success">+ формат</button>
+                </div>
+
               </td>
             </tr>
           </tbody>
         </table>
 
-        <div>
-          <input ref='formatName_input' type="text" @keydown.enter='$refs.formatValue_input.focus()' placeholder='формат'>
-          <input ref='formatValue_input' type="text" @keydown.enter='addFormat($refs.formatName_input.value, $refs.formatValue_input.value);$refs.formatName_input.focus();$refs.formatValue_input.value="";$refs.formatName_input.value=""' placeholder='цена'>
-          <button @click='addFormat($refs.formatName_input.value, $refs.formatValue_input.value);$refs.formatValue_input.value="";$refs.formatName_input.value=""'>+ формат</button>
-          <input ref='themeName_input' type="text" @keydown.enter='addTheme($refs.themeName_input.value);$refs.themeName_input.value=""' placeholder='тема'>
-          <button @click='addTheme($refs.themeName_input.value);$refs.themeName_input.value=""'>+ тема</button>
-        </div>
+
 
         <div>
-          <button @click='loadPricelistPreset("Vipusk 2025")'>load 'Vipusk 2025'</button>
+          <button @click='loadPricelistPreset(0)'>load 'Vipusk 2025'</button>
         </div>
       </div>
 
@@ -417,46 +448,62 @@
 
 
         // pricelist
-        const pricelists = Vue.ref([{% for pl in prices %}[{{pl.id}}, '{{pl.name}}'],{% endfor %}])
-        const pricelist_presets = [
+        //const pricelists = Vue.ref([{% for pl in prices %}[{{pl.id}}, '{{pl.name}}'],{% endfor %}])
+        const pricelists = Vue.reactive([
           {
+            id: 0,
+            loaded: true,
+            dirty: false,
             name: 'Vipusk 2025',
             formats: [
-              {ru:'Фото 10х15', price:100},
-              {ru:'Фото 15х23', price:150},
-              {ru:'Book', price:1500},
+              {ru:'Фото 10х15', price:100, key: 'f10'},
+              {ru:'Фото 15х23', price:150, key: 'f15'},
+              {ru:'Фотокнига', price:1500, key: 'book'},
             ],
             themes: [
-              {ru:'Портрет', formats:['Фото 10х15', 'Фото 15х23']},
-              {ru:'Vint', formats:['Фото 10х15', 'Фото 15х23', 'Book']},
+              {ru:'Портрет', formats:['f10', 'f15'], key: 'port'},
+              {ru:'Винт', formats:['f10', 'f15', 'book'], key: 'vint'},
             ],
           },
-        ]
+          {% for pl in prices %}
+            {
+              id: {{pl.id}},
+              name: '{{pl.name}}',
+            },
+          {% endfor %}
+        ])
+
+        const loadedPrice = Vue.ref(null)
+
         const loadPricelist = (pl) => {
-          let price = pricelist_presets.find(p => p.name === pl[1])
-          if (price === undefined) {
-            fetch('.?pricelist='+pl[0]).then(x => x.json()).then(data => {
+          // pl :: {id, name, loaded:bool, [...]}
+          if (!pl.loaded || !('themes' in pl)) {
+            fetch('.?pricelist='+pl.id).then(x => x.json()).then(data => {
               if (data.status === 'OK') {
-                pricelist_presets.push(data.pricelist)
-                loadPricelistPreset(pl[1])
+                Object.assign(pl, data.pricelist)
+                pl.loaded = true
+                pl.dirty = false
+                loadPricelistPreset(pl)
               }
             })
           } else {
-            loadPricelistPreset(pl[1])
+            loadPricelistPreset(pl)
           }
         }
 
-        const formats = Vue.reactive([])
-        const themes = Vue.reactive([])
+        const formats = Vue.reactive([]) // :: [{ru:str, price:int, key:str}]
+        const themes = Vue.reactive([]) // :: [{ru:str, formats:[str], key:str}]
 
-        const addFormat = (name, price) => {
-          formats.push({ru:name, price:price})
-          themes.forEach(theme => theme.formats.push(name))
+        const addFormat = (format) => {
+          // format :: {ru, key, price}
+          format.key = format.key || format.ru
+          formats.push(format)
+          themes.forEach(theme => theme.formats.push(format.key))
         }
 
         const remFormat = format => {
           themes.forEach(theme => {
-            const index = theme.formats.findIndex(f => f === format.ru)
+            const index = theme.formats.findIndex(f => f === format.key)
             if (~index) {
               theme.formats.splice(index, 1)
             }
@@ -464,28 +511,55 @@
           formats.splice(formats.findIndex(f => f == format), 1)
         }
 
-        const addTheme = (name, fmts) => {
-          themes.push({ru:name, formats:fmts || formats.map(f=>f.ru)})
+        const addTheme = (theme) => {
+          // theme :: {ru, key, formats}
+          theme.key = theme.key || theme.ru
+          themes.push({ru:theme.ru, key:theme.key, formats:theme.formats || formats.map(f=>f.key)})
         }
 
         const remTheme = theme => {
           themes.splice(themes.findIndex(th => th == theme), 1)
         }
 
-        const addThemeFormat = (theme, formatName) => {
-          theme.formats.push(formatName)
+        const addThemeFormat = (theme, formatKey) => {
+          theme.formats.push(formatKey)
         }
 
-        const remThemeFormat = (theme, formatName) => {
-          theme.formats.splice(theme.formats.findIndex(f => f === formatName), 1)
+        const remThemeFormat = (theme, formatKey) => {
+          theme.formats.splice(theme.formats.findIndex(f => f === formatKey), 1)
         }
 
-        const loadPricelistPreset = (name) => {
+        const loadPricelistPreset = (pl) => {
           themes.splice(0)
           formats.splice(0)
-          const preset = pricelist_presets.find(p => p.name === name)
-          preset.formats.forEach(f => addFormat(f.ru, f.price))
-          preset.themes.forEach(th => addTheme(th.ru, th.formats))
+          pl.formats.forEach(addFormat)
+          pl.themes.forEach(addTheme)
+          loadedPrice.value = pl
+        }
+
+        const new_price_name = Vue.useTemplateRef('new_price_name')
+        let new_price_counter = 0
+
+        const addPrice = () => {
+          console.log('[new_price_name]', new_price_name.value)
+          //const name = this.$refs.new_price_name.value.trim()
+          const name = new_price_name.value.value.trim()
+          if (!name.length) {return}
+          const exists = pricelists.find(pl => pl.name === name)
+          if (exists) {return}
+          //this.$refs.new_price_name.value = ''
+          new_price_name.value.value = ''
+          const new_id = `new_${new_price_counter++}`
+          pricelists.push({
+            id: new_id,
+            name,
+            dirty: false,
+            loaded: true,
+            themes: [],
+            formats: [],
+          })
+          const price = pricelists.find(pl => pl.id === new_id)
+          loadPricelistPreset(price)
         }
 
         return {
@@ -506,12 +580,12 @@
           clear() {que.splice(0)},
 
           // pricelist
-          formats,
-          addFormat, remFormat,
-          themes,
-          addTheme, remTheme, addThemeFormat, remThemeFormat,
+          formats, addFormat, remFormat,
+          themes, addTheme, remTheme,
+          addThemeFormat, remThemeFormat,
           loadPricelistPreset,
           pricelists, loadPricelist,
+          addPrice, loadedPrice, new_price_name,
         }
       }
     })
