@@ -285,10 +285,8 @@
       </div>
 
       <div class="modal-body">
-        Прайсы
-
-        <button v-for='pl in pricelists' :key='pl.id' @click='loadPricelist(pl)' :title='`${pl.name} (${pl.id})`' class="btn btn-sm btn-primary">
-          <span :class='{"fw-bold": loadedPrice == pl}'>[[ pl.name ]]</span>
+        <button v-for='pl in pricelists' :key='pl.id' @click='loadPricelist(pl)' :title='`${pl.name} (${pl.id})`' class="btn btn-sm me-1" :class='loadedPrice==pl ? "btn-primary" : "btn-outline-primary"'>
+          <span>[[ pl.name ]]</span>
         </button>
 
         <div class="input-group input-group-sm d-inline-flex w-auto">
@@ -296,7 +294,7 @@
           <button @click='addPrice' class="btn btn-outline-success"><i class="bi bi-plus-lg"></i></button>
         </div>
 
-        <table class="table">
+        <table v-if='loadedPrice' class="table">
           <thead>
             <tr>
               <th :colspan='1 + themes.length' class="text-end border-0">
@@ -324,10 +322,13 @@
           <tbody>
             <tr v-for='format in formats' :key='format.key'>
               <td>
-                <button @click='remFormat(format)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
-                [[ format.ru ]]
-                <span class="text-secondary">([[ format.price ]])</span>
+                <div class="">
+                  <button @click='remFormat(format)' class="btn btn-sm text-danger px-1 py-0"><i class="bi bi-x-lg"></i></button>
+                  [[ format.ru ]]
+                  <span class="text-secondary">([[ format.price ]])</span>
+                </div>
               </td>
+
               <td v-for='theme in themes' :key='theme.key' class="text-center">
                 <button v-if='theme.formats.includes(format.key)' @click='remThemeFormat(theme, format.key)' class="text-success btn btn-sm">
                   <strong>да</strong>
@@ -353,16 +354,12 @@
             </tr>
           </tbody>
         </table>
-
-
-
-        <div>
-          <button @click='loadPricelistPreset(0)'>load 'Vipusk 2025'</button>
-        </div>
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary me-auto" data-bs-dismiss="modal">Закрыть</button>
+
+        <button v-if='dirty' type="button" class="btn btn-success">Сохранить</button>
       </div>
     </Teleport>
   </template>
@@ -452,17 +449,17 @@
         const pricelists = Vue.reactive([
           {
             id: 0,
+            name: 'Vipusk 2025',
             loaded: true,
             dirty: false,
-            name: 'Vipusk 2025',
             formats: [
-              {ru:'Фото 10х15', price:100, key: 'f10'},
-              {ru:'Фото 15х23', price:150, key: 'f15'},
-              {ru:'Фотокнига', price:1500, key: 'book'},
+              {ru:'Фото 10х15', key: 'f10',  price:100},
+              {ru:'Фото 15х23', key: 'f15',  price:150},
+              {ru:'Фотокнига',  key: 'book', price:1500},
             ],
             themes: [
-              {ru:'Портрет', formats:['f10', 'f15'], key: 'port'},
-              {ru:'Винт', formats:['f10', 'f15', 'book'], key: 'vint'},
+              {ru:'Портрет', key: 'port', formats:['f10', 'f15']},
+              {ru:'Винт',    key: 'vint', formats:['f10', 'f15', 'book']},
             ],
           },
           {% for pl in prices %}
@@ -474,6 +471,16 @@
         ])
 
         const loadedPrice = Vue.ref(null)
+
+        const dirty = Vue.computed(() => {
+          console.log('dirty')
+          if (!loadedPrice.value) {return false}
+          if (loadedPrice.value.themes.length != themes.length) {return true}
+          if (loadedPrice.value.formats.length != formats.length) {return true}
+          for (let fmt in formats.value) {
+            console.log(`[dirty?] ${fmt}`)
+          }
+        })
 
         const loadPricelist = (pl) => {
           // pl :: {id, name, loaded:bool, [...]}
@@ -586,6 +593,7 @@
           loadPricelistPreset,
           pricelists, loadPricelist,
           addPrice, loadedPrice, new_price_name,
+          dirty,
         }
       }
     })
