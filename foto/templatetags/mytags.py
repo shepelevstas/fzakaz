@@ -48,3 +48,8 @@ def add_q_value(url_param, value):
   param = url_param['param']
   return f"{url}{'&' if '?' in url else '?'}{param}={value}"
 
+
+@register.simple_tag
+def set_q_param(url, param, value):
+  return f'{url}{"&" if "?" in url else "?"}{param}={value}'
+

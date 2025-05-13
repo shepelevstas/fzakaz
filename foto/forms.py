@@ -69,7 +69,7 @@ class UploadBlanksForm(forms.Form):
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
   files = MultipleFileField(required=True, label="Файлы", attrs={'accept': 'image/jpeg', 'style': 'width:0'})
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, *args, old=True, **kwargs):
     super(UploadBlanksForm, self).__init__(*args, **kwargs)
 
     if kwargs.get('old') == True:

@@ -8,6 +8,7 @@
   {{ block.super }}
   <script src="{% static 'js/clipboard.min.js' %}"></script>
   {% comment %} <script src="/static/upq.js"></script> {% endcomment %}
+  <script src="{% static 'js/htmx203.min.js' %}"></script>
 {% endblock js_libs %}
 
 
@@ -68,93 +69,8 @@
     </thead>
 
     <tbody id="album_items">
-
       {% for album in albums %}
-        <tr data-album="{{album.id}}" class="align-middle {% if album.is_deleted %}text-decoration-line-through{% endif %}">
-
-          {# SESSION #}
-          <td class="ps-2 ps-lg-4">
-            {{album.session}}
-            {% if 'ses' not in request.GET or not request.GET.ses %}
-              <a href="{{request.get_full_path|add_q_param:'ses'|add_q_value:album.session}}" title="Показать только эту съемку">
-                <i class="bi bi-funnel"></i>
-              </a>
-            {% endif %}
-          </td>
-
-          {# ALBUM #}
-          <td class="text-center">
-            {% if 'sh' not in request.GET or not request.GET.sh %}
-              <a href="{{request.get_full_path|add_q_param:'sh'|add_q_value:album.sh}}" title="Показать только эту школу">
-                <i class="bi bi-funnel"></i>
-              </a>
-            {% endif %}
-
-            <a href="{% url 'signed_view' album.sign %}">{{album.name}}</a>
-            <button class="btn btn-sm copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'signed_view' album.sign %}">
-              {% comment %} <i class="bi bi-link-45deg"></i> {% endcomment %}
-              <i class="bi bi-copy"></i>
-            </button>
-
-            {% comment %} <a href="{{request.scheme}}://{{request.get_host}}/money_table/{{album.signed_url}}" class="btn btn-sm"><i class="bi bi-table"></i></a> {% endcomment %}
-            <a href="{{request.scheme}}://{{request.get_host}}/{{album.money_table_url}}">
-              <i class="bi bi-table"></i>
-            </a>
-
-            {% if album.is_closed %}
-              <a href="{% url 'excel_file' album.sign %}" title="Скачать таблицу заказов в Excel">
-                <i class="bi bi-file-earmark-excel-fill"></i>
-              </a>
-
-              <a href="{% url 'orders_file' album.sign %}" title="Скачать заказы в json">
-                <i class="bi bi-box-arrow-down"></i>
-              </a>
-
-              <strong class="text-secondary" title="ЗАКРЫТ"><i class="bi bi-lock-fill"></i></strong>
-            {% endif %}
-          </td>
-
-          {# PROGRESS #}
-          <td class="text-center">
-            <span class="item_count {% if album.is_closed %}text-muted{% endif %}">{{album.ordered_count}} / {{album.blanks_count}}</span>
-            <div class="progress rounded-pill" style="height:10px;">
-              <div class="progress-bar item_progress rounded-end {% if album.is_closed %}bg-opacity-50{% endif %} {% if album.order_progress < 50 %}bg-warning{% elif album.order_progress < 100 %}bg-success{% else %}bg-primary{% endif %}" style="width: {{album.order_progress|unlocalize}}%;"></div>
-            </div>
-            {% if album.last_order_time and 'last_time' in request.GET %}
-              <small title="Последний заказ" class="text-black-50">{{album.last_order_time|date:'Y-b-d'}}</small>
-            {% endif %}
-          </td>
-
-          {# ACTIONS #}
-          <td class="text-center pe-2 pe-lg-4">
-            <form action="{{request.get_full_path}}" method="post" class="action_form d-inline-block">
-              {% csrf_token %}
-              <input type="hidden" name="album_sign" value="{{album.sign}}"/>
-
-              {% if edit %}
-                {% if album.is_deleted %}
-                  <button class="btn btn-outline-success btn-sm" type="submit" name="action" value="undelete" title="Восстановить">
-                    <i class="bi bi-recycle"></i>
-                  </button>
-                {% else %}
-                  <button class="btn btn-sm btn-outline-danger" type="submit" name='action' value="delete" title="Удалить">
-                    <i class="bi bi-trash-fill"></i>
-                  </button>
-                {% endif %}
-              {% endif %}
-
-              {% if album.is_closed %}
-                <button class="btn btn-sm btn-outline-success" type="submit" name="action" value="unclose" title="Открыть">
-                  <i class="bi bi-unlock-fill"></i>
-                </button>
-              {% else %}
-                <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="close" title="Закрыть">
-                  <i class="bi bi-lock-fill"></i>
-                </button>
-              {% endif %}
-            </form>
-          </td>
-        </tr>
+        {% include "part/album_tr.html" %}
       {% endfor %}
     </tbody>
   </table>
