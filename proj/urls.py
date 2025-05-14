@@ -22,6 +22,8 @@ urlpatterns = [
 
     path('<str:code>/<str:session>__<str:sh>_<int:shyear><str:group>/money_table/', views.money_table2, name='money_table2'),
 
+    path('3528ca60-28b5-49d1-8574-66897823a017/money_table/', views.money_table_total, name='money_table_total'),
+
     path('download_orders/<str:sh_cls>:<str:code>/', views.download_orders, name='download_orders'),
 
     path('<str:sign>/orders_file/', views.orders_file, {'format': 'json'}, name='orders_file'),
@@ -37,3 +39,4 @@ if settings.DEBUG:
     #     path('play/', include('play.urls')),
     # ]
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

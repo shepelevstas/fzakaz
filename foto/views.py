@@ -321,6 +321,48 @@ def manage_blanks(request, edit=True):
   })
 
 
+def money_table_total(req):
+  ses = req.GET.get('ses')
+  sh = req.GET.get('sh')
+
+  albums = Album.get_albums(ses, sh)
+
+  album = {
+    'name': '<name>',
+    'session': ses,
+    'sh': sh,
+    'shyear': '2025',
+    'group': '<group>',
+    'ordered_count': 0,
+    'blanks_count': 0,
+    'get_money_table': {
+      'cols': {},
+      'rows': {},
+      'total': 0,
+    },
+  }
+
+  for a in albums:
+    album['blanks_count'] += a.blanks_count
+    album['ordered_count'] += a.ordered_count
+
+    mtable = a.get_money_table()
+
+    for item, col in mtable['cols'].items():
+      c = album['get_money_table']['cols'].get(item)
+      if c:
+        c['q'] += col['q']
+      else:
+        album['get_money_table']['cols'][item] = col
+
+    for item, row in mtable['rows'].items():
+      album['get_money_table']['rows'][item] = row
+
+  return render(req, 'money_table2.html', {
+    'album': album,
+  })
+
+
 def money_table2(req, session, sh, shyear, group, code):
   id = f'{session}__{sh}_{shyear}{group}'
   try:

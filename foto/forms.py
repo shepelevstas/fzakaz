@@ -1,4 +1,7 @@
 from django import forms
+from django.conf import settings
+
+from utils import log
 
 from .models import Session, Album
 
@@ -72,7 +75,8 @@ class UploadBlanksForm(forms.Form):
   def __init__(self, *args, old=True, **kwargs):
     super(UploadBlanksForm, self).__init__(*args, **kwargs)
 
-    if kwargs.get('old') == True:
+    if old == True:
+      log(f'[UploadBlanksForm] OLD')
       self.fields['session'].choices = [
         (i.name, i.name)
         for i in (settings.MEDIA_ROOT / 'blanks').iterdir()

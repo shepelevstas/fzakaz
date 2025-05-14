@@ -58,6 +58,10 @@
         </a>
       {% endif %}
     {% endfor %}
+
+    <a href="{% url "money_table_total" %}" class="btn btn-sm btn-outline-secondary rounded-pill">
+      <i class="bi bi-table"></i>
+    </a>
   </div>
 
   <table class="table table-sm bg-white">
@@ -105,7 +109,7 @@
 
         const data = {}
         data.session = form.querySelector('select[name="session"]').value
-        data.sh = form.querySelector('input[name="sh"]').value
+        data.sh = form.querySelector('select[name="sh"]').value
         data.yr = form.querySelector('select[name="yr"]').value
         data.gr = form.querySelector('select[name="gr"]').value
 
