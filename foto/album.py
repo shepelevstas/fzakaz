@@ -343,6 +343,77 @@ PRICELISTS = {
       "sum": 2000,
     },
     'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
+  },
+  'price_2025_fall': {
+    'version': 'vesna25',
+    'ru': 'Осень 2025',
+    'en': '2025_fall',
+    'formats': {
+      "f10":    {"ru": "Фото 10х15",       "price": 400,  'en': '10x15'},
+      "f15":    {"ru": "Фото 15х23",       "price": 450,  'en': '15x23'},
+      "f20":    {"ru": "Фото 20х30",       "price": 500,  'en': '20x30'},
+      "f30":    {"ru": "Фото 30х42",       "price": 600,  'en': '30x42'},
+      "m10":    {"ru": "Магнит 10х15",     "price": 500,  'en': 'm10x15'},
+      "m15":    {"ru": "Магнит 15х23",     "price": 600,  'en': 'm15x23'},
+      "calend": {"ru": "Календарь 30x42",  "price": 800,  'en': 'calend'},
+      "pill":   {"ru": "Подушка",          "price": 1200, 'en': 'podushka'},
+      "mug":    {"ru": "Кружка",           "price": 800,  'en': 'krujka'},
+      "tshirt": {"ru": "Футболка",         "price": 1200, 'en': 'futbolka'},
+      "tsize":  {"ru": "Обхват груди",     "price": 0,    'en': 'razmer'},
+      "book":   {
+        "ru": "Фотокнига (обложка - коллаж, разворот - виньетка)",
+        "price": 1500,
+        'en': 'kniga',
+      },
+      "set":    {
+        "ru": "Выгодный комплект (портрет, коллаж и виньетка 20х30)",
+        "price": 1200,
+        'en': 'komplekt',
+      },
+    },
+    'themes': {
+      'port': {
+        'ru': 'Портрет',
+        "blank_img_style": "aspect-ratio:726/527;background-position:6.3% 3.2%;background-size:166%;transform:rotate(90deg);margin:13.7% 0;border-radius:0;",
+        'formats': [
+          # order metters
+          "f10", "f15", "f20", "f30", "m10", "m15",
+          "calend",
+          "pill", "mug", "tshirt", "tsize",
+        ],
+      },
+      'vint': {
+        'ru': 'Виньетка',
+        "blank_img_style": "aspect-ratio:726/527;background-size:166%;background-position:6.3% 48.5%;",
+        'formats':[
+          "f15", "f20", "f30", "m10", "m15",
+          "calend",
+          "pill", "mug", "tshirt", "tsize",
+        ],
+      },
+      'coll': {
+        'ru': 'Коллаж',
+        'blank_img_style': 'aspect-ratio:726/527;background-size:166%;background-position:6.3% 94%;',
+        'formats':[
+          "f15", "f20", "f30", "m10", "m15",
+          "calend",
+          "pill", "mug", "tshirt", "tsize",
+        ],
+      },
+      'all': {
+        'ru': 'Все фото',
+        'blank_img_style': 'aspect-ratio:1205/1795;background-size:100%;background-position:center;',
+        'formats':[
+          "book", "set"
+        ],
+      },
+    },
+    'bonus': {
+      "text": "При заказе от %(sum)s₽ - электронный портрет в подарок!",
+      "success": "Электронный портрет в подарок!!",
+      "sum": 2000,
+    },
+    'orders': {}, # {<blank id>: {<img>:{<theme_format>:<q>}}}
   }
 }
 
