@@ -8,11 +8,13 @@ from foto import views
 urlpatterns = [
     path('', include('foto.urls')),
 
+    path('zakaz2/', include('zakaz.urls')),
+
     path('zakaz/<str:session>__<str:sh>_<int:shyear><str:group>/<uuid:uuid>/', views.zakaz, name='zakaz'),
 
     path('blanks/<str:sign>/', views.signed_view, name="signed_view"),
 
-    # http://83.220.168.4/4_1%D0%90:agBVmO1xRZTnMNNwoXg8UBidjXaAv8MSLV0TsdV_gmA/
+    # http://xx.xxx.xxx.x/4_1%D0%90:agBVmO1xRZTnMNNwoXg8UBidjXaAv8MSLV0TsdV_gmA/
 
     path('manage_blanks/bdadc1ad-ebc7-4671-a990-5d223bf913d8/', views.manage_blanks, name='manage_blanks'),
 

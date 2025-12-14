@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% load mytags %}
+
+{% block title %}{{album.name}}{% endblock title %}
+
+{% block content %}
+    <div class="sticky-top shadow bg-white p-1">
+        <h2 class="text-center m-0">
+            Школа {{album.sh}}, класс {{album.year}}{{album.group|ru|upper}}
+        </h2>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-center align-content-center m-2">
+        {% for blank in album.blank_set.all %}
+            <a href="{% url 'blank' blank.sign %}" class="m-1 shadow-sm">
+                {% if blank.style %}
+                {% else %}
+                    <img src="{{blank.img.url}}" alt="{{blank}}" style="width:150px;">
+                {% endif %}
+            </a>
+        {% endfor %}
+    </div>
+    
+{% endblock content %}

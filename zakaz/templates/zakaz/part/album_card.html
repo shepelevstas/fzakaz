@@ -1,0 +1,44 @@
+{% load static mytags l10n %}
+
+<div class="bg-white p-1 border">
+
+    <div class="d-flex justify-content-between">
+        <span>
+            <a href="{% url 'album' album.sign %}" class="{% if album.is_closed %}opacity-50{% endif %}">
+                {{album.year}}{{album.group|ru|upper}}
+            </a>
+
+            <button class="btn btn-sm border-light btn-outline-primary p-1 py-0 focus-ring copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'signed_view' album.sign %}" title="Копировать ссылку">
+              <i class="bi bi-link-45deg"></i>
+            </button>
+
+            <form id="id_album_action_form_{{album.id}}" action="{{request.get_full_path}}" method="post" class="action_form d-inline-flex">
+              {% csrf_token %}
+              <input type="hidden" name="album_id" value="{{album.id}}"/>
+              {% if album.is_closed %}
+                <button class="btn btn-sm btn-outline-secondary border-light p-1 py-0" type="submit" name="action" value="open" title="Открыть">
+                  <i class="bi bi-lock-fill"></i>
+                </button>
+              {% else %}
+                <button
+                  class="btn btn-sm btn-outline-secondary border-light p-1 py-0 opacity-25"
+                  type="submit"
+                  name="action"
+                  value="close"
+                  title="Закрыть"
+                  hx-post="{{request.get_full_path}}"
+                ><i class="bi bi-lock-fill"></i>
+                </button>
+              {% endif %}
+            </form>
+        </span>
+
+        <span class="item_count {% if album.is_closed %}opacity-50{% endif %}">
+            {{album.ordered}} / {{album.blanks}}
+        </span>
+    </div>
+
+    <div class="progress rounded-pill" style="height:10px;">
+      <div class="progress-bar item_progress rounded-end {% if album.is_closed %}bg-opacity-50{% endif %} {% if album.progress < 50 %}bg-warning{% elif album.progress < 100 %}bg-success{% else %}bg-primary{% endif %}" style="width: {{album.progress|unlocalize}}%;"></div>
+    </div>
+</div>

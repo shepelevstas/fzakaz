@@ -1,0 +1,55 @@
+{% load static mytags l10n %}
+<div class="bg-body-secondary sticky-top">
+    <div class="d-flex justify-content-between p-1">
+        <span>
+            <span>{{sh.name}}</span>
+    
+            <span>
+                {% if 'sh' not in request.GET or not request.GET.sh %}
+                  <a href="{% set_q_param request.get_full_path 'sh' sh.name %}" title="Показать только эту школу" class="text-decoration-none">
+                    <i class="bi bi-funnel"></i>
+                  </a>
+                {% else %}
+                    <a href="{{ request.get_full_path|rem_q_param:'sh'|rem_q_value:sh.name }}" title="Убрать из фильтра" class="text-decoration-none">
+                      <i class="bi bi-x-circle-fill"></i>
+                    </a>
+                {% endif %}
+            </span>
+
+            <form id="id_sh_action_form_{{ses.item.id}}_{{sh.name}}" action="{{request.get_full_path}}" method="post" class="action_form d-inline-flex">
+              {% csrf_token %}
+              <input type="hidden" name="session_id" value="{{ses.item.id}}"/>
+              <input type="hidden" name="album_sh" value="{{sh.name}}"/>
+                <button class="btn btn-sm btn-outline-success p-1 py-0 border-0" type="submit" name="action" value="open_all" title="Открыть">
+                  <i class="bi bi-unlock-fill"></i>
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-danger p-1 py-0 border-0"
+                  type="submit"
+                  name="action"
+                  value="close_all"
+                  title="Закрыть"
+                  hx-post="{{request.get_full_path}}"
+                ><i class="bi bi-lock-fill"></i>
+                </button>
+            </form>
+        </span>
+
+        <div class="d-inline-flex">
+            <button class="btn btn-outline-secondary border-0 p-0 px-1"
+                data-bs-toggle="modal"
+                data-bs-target="#id_modal_upload_album"
+                data-bs-title="{{ses.item.year}}_{{ses.item.name}} sh №{{sh.name}}"
+                data-bs-session-id="{{ses.item.id}}"
+                data-bs-sh="{{sh.name}}"
+            >
+                <i class="bi bi-plus-lg"></i>
+            </button>
+
+            <span class="ms-2">
+                {{sh.ordered}} / {{sh.blanks}}
+            </span>
+        </div>
+
+    </div>
+</div>

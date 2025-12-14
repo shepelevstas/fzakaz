@@ -59,26 +59,6 @@
       const btns_plus = document.querySelectorAll('button[data-plus]')
       const btns_minus = document.querySelectorAll('button[data-minus]')
 
-      //function calc() {
-      //  return Array.from(inputs).reduce((m,i)=>
-      //    m + parseInt(i.value || 0) * parseFloat(i.dataset.price)
-      //  ,0)
-      //}
-
-      // f : a -> b
-      // map : (a->b) -> [a] -> [b]
-      // flip : (a->b->c) -> b -> a -> c
-      // flip(map) : [a] -> (a->b) -> [b]
-      // apply : a -> f -> b
-
-      // ? : [f] -> a -> [b]
-      // pipe(apply, flip(map)([f, f]))
-      // flip(map) ([f, f]) (apply(a))
-      // ? : [a -> b] -> a -> [b]
-      // const f = ff => pipe(apply, flip(map)(ff))
-      // compose : (b -> c) -> (a -> b) -> a -> c
-      // pipe(flip(map), compose(apply))
-      // ? : (a->b) -> (b->c) -> a -> c
       // : [a->b] -> a -> [b]
       const applyFuncs = pipe(flip(map), pipe2(apply))
 

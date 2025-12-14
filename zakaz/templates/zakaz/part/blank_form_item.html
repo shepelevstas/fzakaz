@@ -1,0 +1,48 @@
+{% load mytags %}
+<div class="row border-top">
+  <div class="col-4 d-flex align-items-center">
+    {{format.ru}}
+  </div>
+
+  <div class="col-4 d-flex align-items-center justify-content-center">
+    {% if format_k == 'tsize' %}
+      <span class="text-secondary">см</span>
+    {% else %}
+      {{format.price}} <span class="text-secondary ms-1">₽</span>
+    {% endif %}
+  </div>
+
+  <div class="col-4 d-flex align-items-center my-1">
+    <div class="input-group input-group-sm flex-nowrap">
+      {% if format_k != 'tsize' %}
+        <button
+          class="btn btn-sm btn-outline-primary"
+          data-item="{{order_k}}"
+          data-change="-1"
+        ><i class="bi bi-dash-lg"></i></button>
+      {% endif %}
+
+      <input
+        name="{{order_k}}"
+        type="number"
+        min="0"
+        class="w-100 text-center form-control {% if format_k != 'tsize' %}d-none{% endif %}"
+        value="{{q|default:'0'}}"
+        data-price="{{format.price}}">
+
+      {% if format_k != 'tsize' %}
+        <span class="input-group-text fw-bold" data-item="{{order_k}}">
+          {{q|default:'0'}}
+        </span>
+      {% endif %}
+
+      {% if format_k != 'tsize' %}
+        <button
+            class="btn btn-sm btn-outline-primary"
+            data-item="{{order_k}}"
+            data-change="1"
+        ><i class="bi bi-plus-lg"></i></button>
+      {% endif %}
+    </div>
+  </div>
+</div>

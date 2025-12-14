@@ -53,3 +53,11 @@ def add_q_value(url_param, value):
 def set_q_param(url, param, value):
   return f'{url}{"&" if "?" in url else "?"}{param}={value}'
 
+trans_ru = str.maketrans(
+  'abvgdejziklmnoprstyfxCcwWquY',
+  'абвгдежзиклмнопрстуфхцчшщэюя',
+)
+
+@register.filter
+def ru(s):
+    return s.lower().translate(trans_ru)

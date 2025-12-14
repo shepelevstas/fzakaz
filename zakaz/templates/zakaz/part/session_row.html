@@ -1,0 +1,20 @@
+{% load static mytags l10n %}
+<div class="bg-body-secondary sticky-top">
+    <div class="d-flex justify-content-between p-1">
+        <span>
+            {{ses.item.year}}_{{ses.item.name}}
+            <span>
+                {% if 'ses' not in request.GET or not request.GET.ses %}
+                  <a href="{% set_q_param request.get_full_path 'ses' ses.item %}" title="Показать только эту съемку">
+                    <i class="bi bi-funnel"></i>
+                  </a>
+                {% else %}
+                    <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses.item.sig }}" title="Убрать фильтр по съемке">
+                      <i class="bi bi-x-circle-fill"></i>
+                    </a>
+                {% endif %}
+            </span>
+        </span>
+        <span>{{ses.ordered}} / {{ses.blanks}}</span>
+    </div>
+</div>

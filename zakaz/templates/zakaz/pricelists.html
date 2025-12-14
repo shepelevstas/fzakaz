@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+    <div id="id_app"></div>
+{% endblock content %}
+
+{% block js_libs %}
+    {{block.super}}
+    <script src="{% static 'js/vue3522.global.min.js' %}"></script>
+    <script src="{% static 'fp.js' %}"></script>
+{% endblock js_libs %}
+
+{% block js %}
+    <template id="id_theme_template">
+        <div class="bg-white border rounded p-2">
+            <h6>[[ theme.ru ]] <i class="text-black-50">([[ theme.key ]])</i></h6>
+
+            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 user-select-none">
+                <li v-for="(f, index) in theme.formats" :key="f"
+                    @dragenter.prevent="dragenter(index)"
+                    @dragover.prevent="dragenter(index)"
+                    @dragleave.prevent
+                    @drop="drop(index)"
+                >
+                    <span class="mx-2 border" :class="{'opacity-0': !dragging, 'border-primary': index == hlindex}"></span>
+                    <span class="border rounded p-1 shadow-sm cursor-pointer"
+                        :class="{'bg-danger-subtle': !keys.has(f), 'opacity-50': dragindex == index}"
+                        draggable="true"
+                        @dragstart="dragstart(index)"
+                        @dragend="dragend"
+                    >[[ f ]]</span>
+                </li>
+            </ul>
+        </div>
+    </template>
+    <script>
+        const Theme = {
+            template: '#id_theme_template',
+            props: {theme: Object, formats: Array},
+            data() {
+                return {
+                    'dragging': false,
+                    'dragindex': null,
+                    'hlindex': null,
+                }
+            },
+            computed: {
+                keys() {
+                    return new Set(this.formats.map(f => f.key))
+                },
+            },
+            methods: {
+                dragstart(index) {
+                    this.dragging = true
+                    this.dragindex = index
+                },
+                dragenter(index) {
+                    if (!this.dragging) {return}
+                    this.hlindex = index
+                },
+                drop(index) {
+                    if (!this.dragging) {return}
+                    const format = this.theme.formats[this.dragindex]
+                    index = index > this.dragindex ? index -1 : index
+                    this.theme.formats.splice(this.dragindex, 1)
+                    this.theme.formats.splice(index, 0, format)
+                    this.dragend()
+                },
+                dragend() {
+                    this.dragging = false
+                    this.dragindex = null
+                    this.hlindex = null
+                },
+            },
+        }
+    </script>
+
+    
+    <template id="id_main_template">
+        <div v-if="loading" class="d-flex justify-content-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-2">
+                    <h5>прайсы</h5>
+                    <div v-for="p in prices" :key="p.id">
+                        <button v-if="selected_price && selected_price.id == p.id" class="btn btn-light">
+                            [[ p.name ]]
+                        </button>
+                        <button v-else @click="select_price(p)" class="btn btn-link">
+                            [[ p.name ]]
+                        </button>
+                    </div>
+
+                    <hr>
+                    <div>
+                        <button class="btn btn-outline-success" :disabled="!dirty">Сохранить</button>
+                    </div>
+                </div>
+
+                <div v-if="selected_price" class="col-10">
+                    <h5>Прайс "[[ selected_price.name ]]"</h5>
+
+                    <div class="border rounded bg-white mb-4">
+                        <div class="p-2 py-1">
+                            name: <input type="text" v-model="selected_price.name">
+                        </div>
+                    </div>
+
+                    <h6>Форматы</h6>
+                    <div class="border rounded bg-white mb-4">
+                        <div v-for="format in sorted_formats" :key="format.key" class="border-bottom p-2 py-1 d-flex justify-content-between align-items-center" :class="[selected_format && selected_format.key == format.key ? 'border-primary bg-primary-subtle' : '']" @click="select_format(format.key)">
+                            <div>[[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i> </div>
+                            <div class="text-black-50">[[ format.dir ]]<span v-if="format.en">/[[ format.en ]]</span></div>
+                            <div>
+                                [[ format.price ]]
+                                <button v-if="!selected_price.locked" @click.stop="delete_format(format.key)" class="btn btn-sm btn-outline-danger border-0 p-0">
+                                    <i class="bi bi-dash-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div v-if="!selected_price.locked || selected_format" class="p-2 py-1 d-flex flex-wrap gap-1">
+                            <label>имя:<input type="text" v-model="edit_format.ru" required></label>
+                            <label v-if="!selected_price.locked">ID:<input type="text" v-model="edit_format.key" required></label>
+                            <label>папка:<input type="text" v-model="edit_format.dir" required></label>
+                            <label>суфикс:<input type="text" v-model="edit_format.en"></label>
+                            <label v-if="!selected_price.locked">цена:<input type="text" v-model.number="edit_format.price" required></label>
+                            <button @click="save_format" class="btn btn-sm btn-outline-success p-1"><i :class="selected_format ? 'bi bi-check-lg' : 'bi bi-plus-lg'"></i></button>
+                        </div>
+                    </div>
+
+
+                    <h6>Темы</h6>
+                    <div class="row">
+
+                        <div v-for="theme in selected_price.themes" :key="theme.key" class="col-6 mb-4">
+                            <theme :theme="theme" :formats="sorted_formats">
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const App = {
+            template: '#id_main_template',
+
+            components: {Theme},
+
+            data() {
+                return {
+                    loading: false,
+                    loaded: false,
+                    prices: [],
+                    orig: null,
+                    selected_price: null,
+                    selected_format: null,
+                    edit_format: {},
+                }
+            },
+
+            mounted() { this.load() },
+
+            computed: {
+                sorted_formats() {
+                    if (this.selected_price) {
+                        return Object.values(this.selected_price.formats).toSorted((a, b) => 
+                            a.key.toLowerCase().localeCompare(b.key.toLowerCase())
+                        )
+                    }
+                    return []
+                },
+
+                dirty() {
+                    return !eq(this.prices, this.orig)
+                },
+            },
+
+            methods: {
+                load() {
+                    this.loading = true
+                    fetch('.?format=json').then(res => res.json()).then(res => {
+                        if (res.success) {
+                            this.prices = structuredClone(res.data)
+                            this.orig = Object.freeze(res.data)
+                        }
+                    }).finally(() => {
+                        this.loading = false
+                        this.loaded = true
+                    })
+                },
+
+                select_price(p) {
+                    this.selected_price = p
+                    this.selected_format = null
+                    this.edit_format = {}
+                },
+
+                select_format(k) {
+                    if (this.selected_format && this.selected_format.key == k) {
+                        this.selected_format = null
+                    } else {
+                        this.selected_format = this.selected_price.formats[k]
+                        this.edit_format.ru = this.selected_format.ru
+                        this.edit_format.key = this.selected_format.key
+                        this.edit_format.dir = this.selected_format.dir
+                        this.edit_format.en = this.selected_format.en
+                        this.edit_format.price = this.selected_format.price
+                    }
+                },
+
+                save_format() {
+                    if (this.selected_format) {
+                        this.selected_format.ru = this.edit_format.ru
+                        this.selected_format.key = this.edit_format.key
+                        this.selected_format.dir = this.edit_format.dir
+                        this.selected_format.en = this.edit_format.en
+                        this.selected_format.price = this.edit_format.price
+                    } else {
+                        const key = this.edit_format.key
+                        if (key in this.selected_price.formats) {
+                            console.log('format key exists')
+                            return
+                        }
+                        const new_format = {
+                            'key': key,
+                            'ru': this.edit_format.ru,
+                            'dir': this.edit_format.dir,
+                            'en': this.edit_format.en,
+                            'price': this.edit_format.price,
+                        }
+                        this.selected_price.formats[key] = new_format
+                    }
+                },
+
+                delete_format(k) {
+                    delete this.selected_price.formats[k]
+                },
+            },
+        }
+
+        const app = Vue.createApp(App)
+        app.config.compilerOptions.delimiters = ['[[', ']]']
+        const vm = app.mount('#id_app')
+    </script>
+{% endblock js %}

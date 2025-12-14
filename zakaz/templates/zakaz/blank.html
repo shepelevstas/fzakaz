@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+
+{% load mytags static %}
+
+{% block title %}{{blank}}{% endblock title %}
+
+{% block js_libs %}
+    {{block.super}}
+    <script src="{% static 'fp.js' %}"></script>
+{% endblock js_libs%}
+
+{% block js %}
+<script>
+  ;document.addEventListener('DOMContentLoaded', () => {
+    const inputs = document.querySelectorAll('input[type=number][data-price]')
+    const inputs_arr = Array.from(inputs)
+    const totals = document.querySelectorAll('.total_sum')
+    const subm_btn = document.querySelector('button#submit_btn')
+    const cancel_btns = document.querySelectorAll('button[value="cancel_order"]')
+    const order_form = document.querySelector('form#order_form')
+    const form_subm = document.querySelector('button#form_subm_btn')
+    const eport0 = document.querySelectorAll('.eport0')
+    const eport1 = document.querySelectorAll('.eport1')
+
+    const q_buttons = document.querySelectorAll('button[data-change]')
+   
+    const calc = () => {
+      return pipe(
+        map(pipe(
+          applyFuncs([i=>parseInt(i.value||0), i=>parseFloat(i.dataset.price)]),
+          product,
+        )),
+        sum,
+      )(inputs_arr)
+    }
+
+
+    function calcSum(e) {
+      const sum = calc()
+      totals.forEach(i=>i.textContent=sum)
+      if (sum >= {{blank.album.session.pricelist.bonus.sum}}) {
+        eport0.forEach(i=>i.classList.add('d-none'))
+        eport1.forEach(i=>i.classList.remove('d-none'))
+      } else {
+        eport0.forEach(i=>i.classList.remove('d-none'))
+        eport1.forEach(i=>i.classList.add('d-none'))
+      }
+      return sum
+    }
+
+
+    inputs.forEach(input=>input.addEventListener('change', calcSum))
+
+
+    function quant_click(e) {
+        e.preventDefault()
+        {% if blank.album.is_closed %}return{% endif %}
+        const target = e.currentTarget
+        const order_k = target.dataset.item
+        const input = document.querySelector(`input[type=number][name="${order_k}"]`)
+        const change = parseInt(target.dataset.change)
+        input.value = Math.max(0, (Number(input.value)||0) + change)
+        const q = document.querySelector(`span[data-item="${order_k}"]`)
+        q.textContent = input.value
+        calcSum(e)
+    }
+
+
+    q_buttons.forEach(b=>b.addEventListener('click', quant_click))
+
+    calcSum()
+
+    
+    order_form.addEventListener('submit', (e) => {
+      const sum = calc()
+      if (sum <= 0) {
+        e.preventDefault()
+        alert('Ничего не заказано')
+      } else if (inputs_arr.filter(i=>i.name.endsWith('_tshirt') && i.value != '0').length && !inputs_arr.filter(i=>i.name.endsWith('_tsize') && i.value != '0').length) {
+        e.preventDefault()
+        const index = inputs_arr.findIndex(i=>i.name.endsWith('_tshirt') && i.value != '0')
+        const input = inputs_arr.slice(index).find(i=>i.name.endsWith('_tsize'))
+        alert('Заказывая футболку - укажите размер!')
+        setTimeout(()=>{
+          input.scrollIntoView()
+          input.focus()
+        }, 0)
+      }
+    })
+
+
+    const errorlist = document.querySelector('ul.errorlist')
+    if (errorlist) {errorlist.scrollIntoView()}
+ });
+</script>
+{% endblock js%}
+
+
+{% block content %}
+  <div class="position-sticky top-0 z-3 shadow bg-white">
+    <nav class="navbar pb-0">
+      <div class="container-fluid justify-content-center pb-2 border-bottom">
+        <h5 class="mb-0 me-2">{% if blank.album.is_closed %}<strong class="text-danger-emphasis">ПРИЕМ ЗАКАЗОВ ЗАКРЫТ</strong>{% else %}Заказ фотопродукции{% endif %}</h5>
+        <span class="flex-grow-1"></span>
+        <span class="d-flex align-items-center">
+          <strong class="total_sum me-1">0</strong>
+          <strong class="text-secondary me-2">руб</strong>
+          {% if not blank.album.is_closed %}
+            <button id="submit_btn" name="action" value="save" form="order_form" class="btn btn-outline-success">
+              Сохранить заказ
+            </button>
+            {% if blank.is_ordered %}
+              <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+                Отменить
+              </button>
+            {% endif %}
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="d-none d-md-block w-100">
+        <div class="eport0 container-fluid justify-content-center text-center bg-primary text-white py-2 d-none">
+          {{blank.bonus_text}}
+        </div>
+
+        <div class="eport1 container-fluid justify-content-center text-center bg-success text-white py-2 d-none">
+          {{blank.bonus_success}}
+        </div>
+      </div>
+    </nav>
+  </div>
+
+
+  <div class="d-block d-md-none w-100">
+    <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
+      {{blank.bonus_text}}
+    </div>
+
+    <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
+      {{blank.bonus_success}}
+    </div>
+  </div>
+
+
+  <div class="container-fluid py-4">
+    <form action="." method="post" id="order_form">
+      {% csrf_token %}
+      <div class="row">
+        {% with formats=blank.album.session.pricelist.formats_dict %}
+          {% for theme in blank.album.session.pricelist.themes %}
+            <div class="col-12 col-md-6 col-xl-4 col-xxl-3 mb-4">
+              <div class="card shadow">
+                {% if "blank_img_style" in theme %}
+                  <div class="card-img-top" style="background-image:url('{{blank.img.url}}');{{theme.blank_img_style}};"></div>
+                {% endif %}
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <strong>{{theme.ru}}</strong>
+                  </h5>
+                  {% for format_k in theme.formats %}
+                  {% with order_k=theme.key|add:'_'|add:format_k format=formats|lookup:format_k %}
+                  {% with q=blank.order|lookup:order_k %}
+                    {% include 'zakaz/part/blank_form_item.html' %}                                    
+                  {% endwith %}
+                  {% endwith %}
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        {% endwith %}
+      </div>
+
+
+      <div class="row justify-content-center mb-3">
+        {% for field in contacts %}
+          <div class="mb-2 col-12 col-md-4 col-xl-3{% if field.errors %} error{% endif %}">
+            {{field}}
+            {{field.errors}}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="row">
+        <div class="col-12 d-flex align-items-center justify-content-center">
+          <div class="">
+            <strong class="total_sum">0</strong>
+            <strong class="text-secondary me-2">руб</strong>
+          </div>
+          {% if not blank.album.is_closed %}
+            <button id="form_subm_btn" name="action" value="save" class="btn btn-outline-success">
+              Сохранить заказ
+            </button>
+            {% if blank.is_ordered %}
+              <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+                Отменить
+              </button>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+    
+  <div class="d-block d-md-none w-100">
+    <div class="eport0 container-fluid justify-content-center text-center bg-primary text-light py-2 d-none">
+      {{blank.bonus_text}}
+    </div>
+
+    <div class="eport1 container-fluid justify-content-center text-center bg-success text-light py-2 d-none">
+      {{blank.bonus_success}}
+    </div>
+  </div>
+{% endblock content%}
+
+
+{% block css %}
+  <style>
+    .error > input.form-control {
+      --bs-border-opacity: 1;
+      border-color: rgba(var(--bs-danger-rgb),var(--bs-border-opacity))!important;
+    }
+
+    .error > ul.errorlist > li {
+      --bs-text-opacity: 1;
+      color: rgba(var(--bs-danger-rgb),var(--bs-text-opacity))!important;
+    }
+
+    body {
+      background-color: #f9f9f9;
+    }
+    .load_files {
+      text-align: center;
+      display: block;
+      border: 2px solid lightgray;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .load_files input[type=file] {
+      display: none;
+    }
+    .card_shadow {
+      filter:drop-shadow(0 0 15px rgba(0, 0, 0, 0.1));
+      transition: filter .45s cubic-bezier(.23,1,.32,1) 0ms;
+    }
+    .card_shadow:hover {
+      filter:drop-shadow(0 0 15px rgba(0, 0, 0, 0.25));
+    }
+    .card_shadow:hover .card_text {
+      text-shadow: 0 0 3px black;
+    }
+    #UPQUE .progress {
+      height:2px;
+    }
+
+    .cropper {background-color:white;}
+    .cropper .cropper-scale-handle {
+      {% comment %} display: none; {% endcomment %}
+    }
+    .cropper:hover .cropper-scale-handle {
+      {% comment %} display: block; {% endcomment %}
+      background-color:var(--bs-blue);
+    }
+    .item_select {
+      user-select: none;
+      cursor:pointer;
+    }
+    .item_select:hover {
+      background-color:var(--bs-border-color);
+    }
+  </style>
+{% endblock css %}

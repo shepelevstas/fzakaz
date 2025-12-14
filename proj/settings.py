@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'foto',
     # 'kadr',
     # 'play',
+    'zakaz',
 ]
 
 MIDDLEWARE = [

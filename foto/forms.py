@@ -39,10 +39,16 @@ class ContactInfoForm(forms.Form):
     required=True,
     widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Почта'}),
   )
+  contact_name = forms.CharField(
+      label="ФИО для контакта",
+      max_length=60,
+      widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "Имя для контакта"}),
+      required=False,
+  )
   name = forms.CharField(
     label="ФИО РЕБЁНКА",
     max_length=60,
-    required=True,
+    required=False,
     widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "ФИО РЕБЁНКА"}),
   )
 
@@ -52,17 +58,8 @@ class ContactInfoForm(forms.Form):
     return name
 
 
-
-# class BSCharField(forms.CharField):
-#   def __init__(self, *args, **kwargs):
-
-
-
 class UploadBlanksForm(forms.Form):
-  # session = forms.CharField(label='съемка', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
-  # session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[(i.name, i.name) for i in (settings.MEDIA_ROOT / 'blanks').iterdir() if i.is_dir()])
   session = forms.ChoiceField(label='съемка', required=True, widget=forms.Select(attrs={'class':'form-control w-auto'}), choices=[])
-  # sh = forms.CharField(label='SH', required=True, widget=forms.TextInput(attrs={'class':'form-control w-auto'}))
   sh = forms.ChoiceField(label='SH', required=True, widget=forms.Select(attrs={'class': 'form-control w-auto'}), choices=[])
   yr = forms.ChoiceField(label="Год", required=True, choices=[
     (i,i) for i in range(1,12)
@@ -72,10 +69,10 @@ class UploadBlanksForm(forms.Form):
   ], widget=forms.Select(attrs={'class':'form-select w-auto'}))
   files = MultipleFileField(required=True, label="Файлы", attrs={'accept': 'image/jpeg', 'style': 'width:0'})
 
-  def __init__(self, *args, old=True, **kwargs):
+  def __init__(self, *args, old=False, **kwargs):
     super(UploadBlanksForm, self).__init__(*args, **kwargs)
 
-    if old == True:
+    if old:
       log(f'[UploadBlanksForm] OLD')
       self.fields['session'].choices = [
         (i.name, i.name)
@@ -85,7 +82,7 @@ class UploadBlanksForm(forms.Form):
       self.fields['sh'].choices = [('18', '18'), ('90', '90')]
 
     else:
-      self.fields['session'].choices = [(str(s), str(s)) for s in Session.objects.filter(deleted=None)]
+      self.fields['session'].choices = [(s.id, str(s)) for s in Session.objects.filter(deleted=None)]
       self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
 
 

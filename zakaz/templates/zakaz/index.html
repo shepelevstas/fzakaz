@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+
+{% block title %}Альбомы{% endblock title %}
+
+{% load static %}
+
+{% block content %}
+  <div class="p-1">
+    <a href="/zakaz2/pricelists">pricelists</a>
+  </div>
+  {% for ses in sessions.items %}
+    {% include 'zakaz/part/session_row.html' %}
+    {% for sh in ses.items %}
+      {% include 'zakaz/part/sh_row.html' %}
+      <div class="row m-0">
+        {% for album in sh.items %}
+          <div class="col-6 col-sm-4 col-md-3 col-lg-2 p-0 m-0">
+            {% include 'zakaz/part/album_card.html' %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  {% endfor %}
+{% endblock content %}
+
+{% block modal %}
+    <div class="modal fade" id="id_modal_upload_album" tabindex="-1" data-bs-backdrop="static">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="exampleModalLabel">Загрузить альбом</h1>
+            <button type="button" class="btn-close on_upload_disable" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+            <form id="upload_form" action="." method="post" enctype="multipart/form-data" class="">
+                {% csrf_token %}
+
+                {% for f in form %}
+                  {% if f.name == 'files' %}
+                    <label class="d-flex align-items-center on_upload_hide">
+                      <span id="id_select_files_btn" class="btn btn-success">Выбрать файлы</span>
+                      {{f}}
+                      <span class="ms-2">
+                        выбрано: <span id="id_selected_files_count">0</span>
+                      </span>
+                    </label>
+                  {% elif f.name == 'session' or f.name == 'sh' %}
+                    <input type="text" name="{{f.name}}" id="id_{{f.name}}" class="d-none">
+                  {% elif f.name == 'yr' or f.name == 'gr' %}
+                    <div class="mb-3">
+                        {{f.label}}
+                        <div>
+                            {% for ch in f.field.choices %}
+                              <input id="id_{{f.name}}_{{ch.0}}" type="radio" class="btn-check" name="{{f.name}}" value="{{ch.0}}" autocomplete="off">
+                              <label for="id_{{f.name}}_{{ch.0}}" class="btn btn-sm btn-light mb-1">{{ch.1}}</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                  {% else %}
+                    {{f.label}}:{{f}}
+                  {% endif %}
+                {% endfor %}
+
+            </form>
+
+            <div class="d-none on_upload_show">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span id="id_spinner" class="spinner-border spinner-border-sm"></span>
+                    <span>
+                        <span id="id_done">0</span>
+                        /
+                        <span id="id_todo">0</span>
+                    </span>
+                </div>
+
+                <div class="progress rounded-pill" style="height:10px;">
+                  <div class="progress-bar item_progress rounded-end bg-primary" style="width: 34%;"></div>
+                </div>
+            </div>
+
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary on_upload_disable" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-primary on_upload_disable disabled" name='action' value='upload' form='upload_form'>
+                Загрузить
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock modal %}
+
+{% block js_libs %}
+    {{block.super}}
+    <script src="{% static 'js/clipboard.min.js' %}"></script>
+    <script src="{% static 'js/htmx207.min.js' %}"></script>
+{% endblock js_libs %}
+
+{% block js %}
+    <script>
+        const up_modal = document.querySelector('#id_modal_upload_album')
+
+        up_modal.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget
+            const title = button.getAttribute('data-bs-title')
+            const ses_id = button.getAttribute('data-bs-session-id')
+            const sh = button.getAttribute('data-bs-sh')
+            const title_el = up_modal.querySelector('.modal-title')
+            const ses_input = up_modal.querySelector('input#id_session')
+            const sh_input = up_modal.querySelector('input#id_sh')
+            ses_input.value = ses_id
+            sh_input.value = sh
+            title_el.textContent = `Загрузить альбом в ${title}`
+        })
+
+        const que = []
+        const que_todo = []
+        const que_done = []
+
+        function upload(item) {
+          setDone()
+
+          if (item === undefined) {
+            setState('idle')
+            window.location.reload()
+            window.location.href = window.location.href
+            return
+          }
+
+          fetch('{{ request.path }}', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              //'Content-Type': 'multipart/form-data',
+              'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: item,
+            //signal: controller.signal,
+          }).then(res => res.json()).then(res => {
+            que_done.push(item)
+          }).catch(err => {
+            console.log('[err]\n', err)
+          }).finally(() => {
+            upload(que_todo.pop())
+          })
+        }
+
+        function setTodo(value) {
+            if (value === undefined) { value = que.length }
+            up_modal.querySelector('#id_selected_files_count').textContent = value
+            up_modal.querySelector('#id_todo').textContent = value
+        }
+
+        function setDone(value) {
+            if (value === undefined) {value = que_done.length}
+            up_modal.querySelector('#id_done').textContent = value
+            up_modal.querySelector('.item_progress').style.width = `${Math.min(100, 100*value/que.length)}%`
+        }
+
+        function setState(value) {
+            if (value === 'upload') {
+                up_modal.querySelectorAll('.on_upload_hide').forEach(i => i.classList.add('d-none'))
+                up_modal.querySelectorAll('.on_upload_show').forEach(i => i.classList.remove('d-none'))
+                up_modal.querySelectorAll('.on_upload_disable').forEach(i => i.classList.add('disabled'))
+            } else if (value === 'idle') {
+                up_modal.querySelectorAll('.on_upload_hide').forEach(i => i.classList.remove('d-none'))
+                up_modal.querySelectorAll('.on_upload_show').forEach(i => i.classList.add('d-none'))
+                up_modal.querySelectorAll('.on_upload_disable').forEach(i => i.classList.remove('disabled'))
+            }
+        }
+
+        function setCanUpload(value) {
+            if (value) {
+                up_modal.querySelector('button[type="submit"]').classList.remove('disabled')
+            } else {
+                up_modal.querySelector('button[type="submit"]').classList.add('disabled')
+            }
+        }
+
+        ;document.addEventListener('DOMContentLoaded', () => {
+          new ClipboardJS('.copylink')
+
+          const form = up_modal.querySelector('form#upload_form[method="POST"]')
+          const input_files = form.querySelector('input[type="file"][name="files"]')
+
+          form.addEventListener('submit', function(e) {
+            e.preventDefault()
+            const files = [...input_files.files]
+            input_files.value = ''
+
+            setState('upload')
+
+            files.forEach(file => {
+              const data = new FormData(form)
+              data.set('files', file)
+              data.set('action', 'upload')
+              que_todo.push(data)
+              que.push(data)
+            })
+
+            upload(que_todo.pop())
+          })
+
+          input_files.addEventListener('change', ev => {
+              const len = ev.target.files.length
+              setTodo(len)
+              setCanUpload(len)
+          })
+        });
+    </script>
+{% endblock js %}
