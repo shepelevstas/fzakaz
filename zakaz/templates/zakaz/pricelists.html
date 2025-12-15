@@ -15,22 +15,81 @@
 {% block js %}
     <template id="id_theme_template">
         <div class="bg-white border rounded p-2">
-            <h6>[[ theme.ru ]] <i class="text-black-50">([[ theme.key ]])</i></h6>
+            <h6>[[ theme.ru ]] <i class="text-black-50 me-2">([[ theme.key ]])</i>
+                <button @click="$emit('remove')" class="btn btn-outline-danger border-0 p-0"><i class="bi bi-dash-lg"></i></button>
+            </h6>
 
-            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 user-select-none">
+            <div class="mb-1">
+                <label class="d-flex align-items-center">имя: <input type="text" v-model="theme.ru" class="flex-grow-1"></label>
+            </div>
+
+            <div class="mb-1">
+                <label class="d-flex align-items-center">ID: <input type="text" v-model="theme.key" class="flex-grow-1"></label>
+            </div>
+
+            <div class="mb-1">
+                <label class="d-flex align-items-center">style: <textarea v-model="theme.blank_img_style" class="flex-grow-1"></textarea></label>
+            </div>
+
+            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 user-select-none rounded p-1"
+                :class="{'bg-success-subtle': dragging}"
+                @dragleave.stop.capture.prevent="enter(null)"
+                @dragenter.stop.prevent="enter(theme.formats.length)"
+                @dragover.stop.prevent="enter(theme.formats.length)"
+                @drop="drop(theme.formats.length)"
+            >
                 <li v-for="(f, index) in theme.formats" :key="f"
-                    @dragenter.prevent="dragenter(index)"
-                    @dragover.prevent="dragenter(index)"
-                    @dragleave.prevent
+                    @dragenter.stop.prevent="enter(index)"
+                    @dragover.stop.prevent="enter(index)"
+                    @dragleave.stop.prevent
                     @drop="drop(index)"
                 >
                     <span class="mx-2 border" :class="{'opacity-0': !dragging, 'border-primary': index == hlindex}"></span>
-                    <span class="border rounded p-1 shadow-sm cursor-pointer"
+                    <span class="border rounded p-1 shadow-sm cursor-pointer bg-primary-subtle"
                         :class="{'bg-danger-subtle': !keys.has(f), 'opacity-50': dragindex == index}"
                         draggable="true"
-                        @dragstart="dragstart(index)"
-                        @dragend="dragend"
+                        @dragstart="drag(index)"
+                        @dragend="end"
                     >[[ f ]]</span>
+                </li>
+
+                <li @dragenter.prevent="enter(theme.formats.length)"
+                    @dragover.prevent
+                    @dragleave.prevent
+                    @drop="drop(theme.formats.length)"
+                >
+                    <span class="mx-2 border"
+                        :class="{'opacity-0': !dragging, 'border-primary': theme.formats.length == hlindex}"
+                    ></span>
+                    <span v-if="theme.formats.length > 1" class="border rounded p-1 shadow-sm cursor-pointer bg-secondary-subtle text-danger"
+                        @click="remove_all"
+                    ><i class="bi bi-dash-lg me-1"></i>
+                        Все
+                    </span>
+                </li>
+            </ul>
+
+            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 mt-4 user-select-none rounded p-1"
+                style="min-height:32px;"
+                :class="{'bg-danger-subtle': dragging}"
+                @dragenter.prevent
+                @dragover.prevent
+                @dragleave.prevent
+                @drop="remove"
+            >
+                <li v-for="(f, index) in unused_formats" :key="f" class="pe-2">
+                    <span class="border rounded p-1 shadow-sm cursor-pointer bg-success-subtle"
+                        draggable="true"
+                        @dragstart="drag_add(index)"
+                        @dragend="end"
+                    >[[ f ]]</span>
+                </li>
+                <li v-if="unused_formats.length">
+                    <span class="border rounded p-1 shadow-sm cursor-pointer bg-secondary-subtle text-success"
+                        @click="add_all"
+                    ><i class="bi bi-plus-lg me-1"></i>
+                        Все
+                    </span>
                 </li>
             </ul>
         </div>
@@ -38,40 +97,72 @@
     <script>
         const Theme = {
             template: '#id_theme_template',
+            emits: ['remove'],
             props: {theme: Object, formats: Array},
             data() {
                 return {
-                    'dragging': false,
-                    'dragindex': null,
-                    'hlindex': null,
+                    dragging: false,
+                    dragindex: null,
+                    addindex: null,
+                    hlindex: null,
+                    fmt: null,
                 }
             },
             computed: {
                 keys() {
                     return new Set(this.formats.map(f => f.key))
                 },
+                unused_formats() {
+                    return [...this.keys.difference(new Set(this.theme.formats))].toSorted()
+                },
             },
             methods: {
-                dragstart(index) {
+                drag(index) {
                     this.dragging = true
                     this.dragindex = index
+                    this.fmt = this.theme.formats[index]
                 },
-                dragenter(index) {
+                drag_add(index) {
+                    this.dragging = true
+                    this.addindex = index
+                    this.fmt = this.unused_formats[index]
+                },
+                enter(index) {
                     if (!this.dragging) {return}
                     this.hlindex = index
                 },
                 drop(index) {
                     if (!this.dragging) {return}
-                    const format = this.theme.formats[this.dragindex]
-                    index = index > this.dragindex ? index -1 : index
-                    this.theme.formats.splice(this.dragindex, 1)
-                    this.theme.formats.splice(index, 0, format)
-                    this.dragend()
-                },
-                dragend() {
-                    this.dragging = false
+
+                    if (Number.isInteger(this.addindex)) {
+                        this.theme.formats.splice(index, 0, this.fmt)
+                    } else if (Number.isInteger(this.dragindex)) {
+                        const i = index > this.dragindex ? index - 1 : index
+                        this.theme.formats.splice(this.dragindex, 1)
+                        this.theme.formats.splice(i, 0, this.fmt)
+                    }
+                    this.fmt = null
                     this.dragindex = null
                     this.hlindex = null
+                    this.addindex = null
+                },
+                remove() {
+                    if (!this.dragging || !Number.isInteger(this.dragindex)) {return}
+                    this.theme.formats.splice(this.dragindex, 1)
+                    this.fmt = null
+                    this.dragindex = null
+                    this.hlindex = null
+                    this.addindex = null
+                },
+                end() {
+                    this.dragging = false
+                },
+                add_all() {
+                    const all = [...this.unused_formats]
+                    all.forEach(f => this.theme.formats.push(f))
+                },
+                remove_all() {
+                    this.theme.formats = []
                 },
             },
         }
@@ -105,7 +196,7 @@
                 </div>
 
                 <div v-if="selected_price" class="col-10">
-                    <h5>Прайс "[[ selected_price.name ]]"</h5>
+                    <h5>Прайс "[[ selected_price.name ]]" <i class="text-black-50">([[ selected_price.id ]])</i></h5>
 
                     <div class="border rounded bg-white mb-4">
                         <div class="p-2 py-1">
@@ -118,7 +209,7 @@
                         <div v-for="format in sorted_formats" :key="format.key" class="border-bottom p-2 py-1 d-flex justify-content-between align-items-center" :class="[selected_format && selected_format.key == format.key ? 'border-primary bg-primary-subtle' : '']" @click="select_format(format.key)">
                             <div>[[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i> </div>
                             <div class="text-black-50">[[ format.dir ]]<span v-if="format.en">/[[ format.en ]]</span></div>
-                            <div>
+                            <div class="text-nowrap ms-2">
                                 [[ format.price ]]
                                 <button v-if="!selected_price.locked" @click.stop="delete_format(format.key)" class="btn btn-sm btn-outline-danger border-0 p-0">
                                     <i class="bi bi-dash-lg"></i>
@@ -130,18 +221,18 @@
                             <label>имя:<input type="text" v-model="edit_format.ru" required></label>
                             <label v-if="!selected_price.locked">ID:<input type="text" v-model="edit_format.key" required></label>
                             <label>папка:<input type="text" v-model="edit_format.dir" required></label>
-                            <label>суфикс:<input type="text" v-model="edit_format.en"></label>
+                            <label>суффикс:<input type="text" v-model="edit_format.en"></label>
                             <label v-if="!selected_price.locked">цена:<input type="text" v-model.number="edit_format.price" required></label>
                             <button @click="save_format" class="btn btn-sm btn-outline-success p-1"><i :class="selected_format ? 'bi bi-check-lg' : 'bi bi-plus-lg'"></i></button>
                         </div>
                     </div>
 
 
-                    <h6>Темы</h6>
+                    <h6>Темы <button @click="add_theme" class="btn btn-outline-secondary border-0 p-1 py-0"><i class="bi bi-plus-lg"></i></button></h6>
                     <div class="row">
 
-                        <div v-for="theme in selected_price.themes" :key="theme.key" class="col-6 mb-4">
-                            <theme :theme="theme" :formats="sorted_formats">
+                        <div v-for="(theme, index) in selected_price.themes" :key="index" class="col-6 mb-4">
+                            <theme :theme="theme" :formats="sorted_formats" @remove="remove_theme(index)">
                         </div>
 
                     </div>
@@ -244,6 +335,19 @@
 
                 delete_format(k) {
                     delete this.selected_price.formats[k]
+                },
+
+                add_theme() {
+                    if (this.selected_price.themes.find(th => th.key === '')) {return}
+                    this.selected_price.themes.push({
+                        key: '',
+                        ru: '',
+                        formats: [],
+                        blank_img_style: '',
+                    })
+                },
+                remove_theme(index) {
+                    this.selected_price.themes.splice(index, 1)
                 },
             },
         }
