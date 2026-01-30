@@ -5,8 +5,9 @@
 {% load static %}
 
 {% block content %}
-  <div class="p-1">
-    <a href="/zakaz2/pricelists">pricelists</a>
+  <div class="p-1 d-flex justify-content-between">
+    <a href="{% url 'pricelists' %}">pricelists</a>
+    <a href="#" data-bs-toggle="modal" data-bs-target="#id_modal_add_session">+ session</a>
   </div>
   {% for ses in sessions.items %}
     {% include 'zakaz/part/session_row.html' %}
@@ -90,12 +91,55 @@
         </div>
       </div>
     </div>
+
+
+    <div class="modal fade" id="id_modal_add_session" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5">Добавить сессию</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+
+            <form id="id_form_add_session" action="." method="post" enctype="multipart/form-data" class="">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    Год
+                    <div>
+                        {% now "Y" as year %}
+                        <input id="id_add_session_year_{{year|add:"-1"}}" type="radio" class="btn-check" name="session_year" value="{{year|add:"-1"}}" autocomplete="off">
+                        <label for="id_add_session_year_{{year|add:"-1"}}" class="btn btn-sm btn-light mb-1">{{year|add:"-1"}}</label>
+                        <input id="id_add_session_year_{{year}}" type="radio" class="btn-check" name="session_year" value="{{year}}" autocomplete="off">
+                        <label for="id_add_session_year_{{year}}" class="btn btn-sm btn-light mb-1">{{year}}</label>
+                        <input id="id_add_session_year_{{year|add:"1"}}" type="radio" class="btn-check" name="session_year" value="{{year|add:"1"}}" autocomplete="off">
+                        <label for="id_add_session_year_{{year|add:"1"}}" class="btn btn-sm btn-light mb-1">{{year|add:"1"}}</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label><div>Название</div><input type="text" name="session_name" required></label>
+                </div>
+
+            </form>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-primary" name='action' value='add_session' form='id_form_add_session'>
+                Добавить
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 {% endblock modal %}
 
 {% block js_libs %}
     {{block.super}}
     <script src="{% static 'js/clipboard.min.js' %}"></script>
-    <script src="{% static 'js/htmx207.min.js' %}"></script>
+    {#<script src="{% static 'js/htmx207.min.js' %}"></script>#}
 {% endblock js_libs %}
 
 {% block js %}

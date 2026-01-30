@@ -1,8 +1,14 @@
+import json
 from datetime import datetime
+# from sortedcontainers import SortedList
+
 from django.core.signing import Signer, BadSignature
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
+from django.db.models import F, Q, BooleanField, ExpressionWrapper
+
 from foto.forms import UploadBlanksForm, ContactInfoForm
+
 from .utils import en
 from .models import Album, Session, Blank, Pricelist
 
@@ -67,6 +73,8 @@ def index(req):
                     'success': res,
                     'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
                 })
+            case 'add_session':
+                pass
     
     albums = Album.objects.all()
 
@@ -81,14 +89,14 @@ def index(req):
     if sh:
         albums = albums.filter(sh=sh)
 
-    sessions = Sorted(
+    sessions = Sorted( # sorted sessoins
         key=lambda ses: (ses.item.year, ses.item.created),
         reverse=True,
-        add=lambda alb: Sorted(
+        add=lambda alb: Sorted( # sorted sh
             key=lambda sh: sh.name,
             item=alb.session,
             attrs={'ordered': 0, 'blanks': 0},
-            add=lambda alb: Sorted(
+            add=lambda alb: Sorted( # sorted albums
                 key=lambda alb: (alb.year, alb.group),
                 attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0},
             )
@@ -162,8 +170,19 @@ def blank(req, sign):
     except BadSignature:
         return HttpResponse('NotFound', 404)
 
+    isodate = req.GET.get('isodate')
+
     [_, id] = unsigned.rsplit('__', 1)
-    blank = Blank.objects.get(id=id)
+    blank = Blank.objects.select_related('album__session__pricelist').get(id=id)
+    blank.is_closed = blank.album.is_closed
+
+    if isodate:
+        order = next((i for i in blank.orders if i['date'] == isodate), None)
+        if order:
+            blank.ordered = datetime.fromisoformat(order['date']) 
+            blank.order = order
+            blank.is_closed = True
+            blank.is_cancelable = -100 < order['status'] < 200
 
     contacts = ContactInfoForm(req.POST or blank.order or None, initial={'name': blank.name})
 
@@ -176,12 +195,13 @@ def blank(req, sign):
             message = ''
 
             if action == 'save':
-                blank.order = order
                 blank.ordered = datetime.now()
+                order['date'] = blank.ordered.replace(microsecond=0).isoformat()
+                blank.order = order
                 message = 'Спасибо за заказ! Пока прием заказов не закрыт, Вы всегда можете вернуться и изменить его! Это не создаст новый заказ, а изменит имеющийся! Если Вам полагается электронный портрет в подарок - не забудьте указать правильный адрес электронной почты. Можно вернуться назад и изменить контактные данные.'
 
             elif action == 'cancel_order':
-                blank.cancel()
+                blank.cancel(isodate)
                 message = 'Заказ отменен!'
 
             blank.save()
@@ -203,4 +223,38 @@ def pricelists(req):
             'data': [p.as_json() for p in Pricelist.objects.all()]
         })
 
+    if req.method == "POST":
+        data = json.loads(req.body.decode('utf8'))
+        id = data.get('id')
+        if id and id.isdigit():
+            pricelist = Pricelist.objects.get(id=id)
+        else:
+            pricelist = Pricelist()
+        pricelist.name = data['name']
+        pricelist.formats = list(data['formats'].values())
+        pricelist.themes = data['themes']
+        pricelist.bonus = data['bonus']
+        pricelist.save()
+
+        return JsonResponse({'success': True, 'id': pricelist.id})
+
     return render(req, 'zakaz/pricelists.html', {})
+
+
+def table(req, id):
+
+    album = Album.objects.get(id=id)
+
+    blanks = album.blank_set.all()
+    for b in blanks:
+        if not b.name:
+            b.name = b.order['name'] if b.order and 'name' in b.order else next((o['name'] for o in b.orders if 'name' in o), '--')
+        for o in b.orders:
+            if 'date' not in o:continue
+            o['date'] = datetime.fromisoformat(o['date'])
+        
+
+    return render(req, 'zakaz/table.html', {
+       'album': album,
+       'blanks': blanks,
+    })

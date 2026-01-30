@@ -54,7 +54,7 @@
 
     function quant_click(e) {
         e.preventDefault()
-        {% if blank.album.is_closed %}return{% endif %}
+        {% if blank.is_closed %}return{% endif %}
         const target = e.currentTarget
         const order_k = target.dataset.item
         const input = document.querySelector(`input[type=number][name="${order_k}"]`)
@@ -100,20 +100,30 @@
   <div class="position-sticky top-0 z-3 shadow bg-white">
     <nav class="navbar pb-0">
       <div class="container-fluid justify-content-center pb-2 border-bottom">
-        <h5 class="mb-0 me-2">{% if blank.album.is_closed %}<strong class="text-danger-emphasis">ПРИЕМ ЗАКАЗОВ ЗАКРЫТ</strong>{% else %}Заказ фотопродукции{% endif %}</h5>
+        <h5 class="mb-0 me-2">
+            {% if request.GET.isodate %}
+                Заказ от <span class="text-muted">{{blank.ordered}}</span>
+            {% elif blank.is_closed %}
+                <strong class="text-danger-emphasis">
+                    ПРИЕМ ЗАКАЗОВ ЗАКРЫТ
+                </strong>
+            {% else %}
+                Заказ фотопродукции
+            {% endif %}
+        </h5>
         <span class="flex-grow-1"></span>
         <span class="d-flex align-items-center">
           <strong class="total_sum me-1">0</strong>
           <strong class="text-secondary me-2">руб</strong>
-          {% if not blank.album.is_closed %}
+          {% if not blank.is_closed %}
             <button id="submit_btn" name="action" value="save" form="order_form" class="btn btn-outline-success">
               Сохранить заказ
             </button>
-            {% if blank.is_ordered %}
-              <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
-                Отменить
-              </button>
-            {% endif %}
+          {% endif %}
+          {% if blank.is_cancelable and not request.GET.isodate %}
+            <button class="btn btn-outline-danger ms-2" name="action" value="cancel_order" form="order_form">
+              Отменить
+            </button>
           {% endif %}
         </span>
       </div>
@@ -143,6 +153,30 @@
 
 
   <div class="container-fluid py-4">
+
+    {% if blank.orders %}
+    <div class="row mb-4"><div class="col-12">
+        <h5>Предыдущие заказы</h5>
+        {% for order in blank.orders_json %}
+            <div>
+                <span class="text-muted">{{ order.date }}</span>
+                <strong>{{ order.sum }}₽</strong>
+                <span class="{% if order.status == 100 %}text-success{% endif %}">{{ order.status_ru }}</span>
+                {% if request.GET.isodate == order.isodate %}
+                    <span class="text-black-50">(показан сейчас)</span>
+                {% else %}
+                    <a href=".?isodate={{order.isodate|urlencode}}">Показать</a>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        {% if request.GET.isodate %}
+            <div><a href=".">Показать текущий заказ</a></div>
+        {% endif %}
+    </div></div>
+    {% endif %}
+    
+
     <form action="." method="post" id="order_form">
       {% csrf_token %}
       <div class="row">
@@ -187,7 +221,7 @@
             <strong class="total_sum">0</strong>
             <strong class="text-secondary me-2">руб</strong>
           </div>
-          {% if not blank.album.is_closed %}
+          {% if not blank.is_closed %}
             <button id="form_subm_btn" name="action" value="save" class="btn btn-outline-success">
               Сохранить заказ
             </button>

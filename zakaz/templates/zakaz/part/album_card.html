@@ -12,6 +12,8 @@
               <i class="bi bi-link-45deg"></i>
             </button>
 
+            <a href="{% url 'table' album.id %}"><i class="bi bi-table"></i></a>
+
             <form id="id_album_action_form_{{album.id}}" action="{{request.get_full_path}}" method="post" class="action_form d-inline-flex">
               {% csrf_token %}
               <input type="hidden" name="album_id" value="{{album.id}}"/>
@@ -26,7 +28,7 @@
                   name="action"
                   value="close"
                   title="Закрыть"
-                  hx-post="{{request.get_full_path}}"
+                  hx-post-="{{request.get_full_path}}"
                 ><i class="bi bi-lock-fill"></i>
                 </button>
               {% endif %}

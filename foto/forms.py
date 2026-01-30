@@ -39,7 +39,7 @@ class ContactInfoForm(forms.Form):
     required=True,
     widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Почта'}),
   )
-  contact_name = forms.CharField(
+  contactname = forms.CharField(
       label="ФИО для контакта",
       max_length=60,
       widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "Имя для контакта"}),

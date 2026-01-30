@@ -13,8 +13,8 @@
   </div>
 
   <div class="col-4 d-flex align-items-center my-1">
-    <div class="input-group input-group-sm flex-nowrap">
-      {% if format_k != 'tsize' %}
+    <div class="input-group input-group-sm flex-nowrap justify-content-end">
+      {% if format_k != 'tsize' and not blank.is_closed %}
         <button
           class="btn btn-sm btn-outline-primary"
           data-item="{{order_k}}"
@@ -36,7 +36,7 @@
         </span>
       {% endif %}
 
-      {% if format_k != 'tsize' %}
+      {% if format_k != 'tsize' and not blank.is_closed %}
         <button
             class="btn btn-sm btn-outline-primary"
             data-item="{{order_k}}"
