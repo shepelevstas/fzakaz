@@ -8,7 +8,7 @@
                 {{album.year}}{{album.group|ru|upper}}
             </a>
 
-            <button class="btn btn-sm border-light btn-outline-primary p-1 py-0 focus-ring copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'signed_view' album.sign %}" title="Копировать ссылку">
+            <button class="btn btn-sm border-light btn-outline-primary p-1 py-0 focus-ring copylink" data-clipboard-text="{{request.scheme}}://{{request.get_host}}{% url 'album' album.sign %}" title="Копировать ссылку">
               <i class="bi bi-link-45deg"></i>
             </button>
 
