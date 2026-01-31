@@ -219,6 +219,8 @@ def blank(req, sign):
                 blank.ordered = datetime.now()
                 order['date'] = blank.ordered.replace(microsecond=0).isoformat()
                 blank.order = order
+                if blank.name and order['name'].strip() and blank.name != order['name'].strip():
+                    blank.name = order['name'].strip()
                 message = 'Спасибо за заказ! Пока прием заказов не закрыт, Вы всегда можете вернуться и изменить его! Это не создаст новый заказ, а изменит имеющийся! Если Вам полагается электронный портрет в подарок - не забудьте указать правильный адрес электронной почты. Можно вернуться назад и изменить контактные данные.'
 
             elif action == 'cancel_order':
