@@ -4,8 +4,35 @@
 
 {% load static mytags %}
 
+{% block js %}
+    <script>
+        ;(function(){
+            const form = document.querySelector('form#id_form_load_csv')
+            const input = document.querySelector('input[type="file"][form="id_form_load_csv"]')
+            input.addEventListener('change', () => {
+                if (input.files.length) {
+                    form.submit()
+                }
+            })
+        })();
+    </script>
+{% endblock js %}
+
 {% block content %}
     <div class="container-fluid py-2">
+        <div class="row mb-4 mt-3">
+            <div class="col-12">
+                <form action="." enctype="multipart/form-data" method="post" class="d-none" id="id_form_load_csv">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="load_csv">
+                </form>
+                <label>
+                    <span class="btn btn-sm btn-light shadow-sm">Load CSV</span>
+                    <input type="file" name="file" class="d-none" form="id_form_load_csv" accept=".csv, text/csv">
+                </label>
+            </div>
+        </div>
+
         <div class="row">
             {% for blank in blanks %}
                 <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">

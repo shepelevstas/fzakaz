@@ -241,11 +241,25 @@ def pricelists(req):
     return render(req, 'zakaz/pricelists.html', {})
 
 
-def table(req, id):
-
-    album = Album.objects.get(id=id)
+def table(req, sign):
+    album = Album.from_sign(sign)
 
     blanks = album.blank_set.all()
+
+    if req.method == "POST":
+        if req.POST.get('action') == 'load_csv':
+            file = req.FILES.get('file')
+            for line in file:
+                line = line.strip().decode(encoding='cp1251').split(';')
+                if len(line) < 2: continue
+                [imgn, name, *rest] = line
+                if len(imgn) != 4 or not imgn.isdigit(): continue
+                blank = blanks.filter(imgname__contains=imgn)
+                if not blank.exists(): continue
+                blank = blank[0]
+                blank.name = name
+                blank.save()
+
     for b in blanks:
         if not b.name:
             b.name = b.order['name'] if b.order and 'name' in b.order else next((o['name'] for o in b.orders if 'name' in o), '--')
