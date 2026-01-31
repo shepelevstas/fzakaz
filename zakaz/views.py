@@ -56,25 +56,46 @@ class Sorted:
 def index(req):
 
     if req.method == "POST" and req.POST.get('action'):
-        match req.POST.get('action'):
-            case 'close':
-                Album.objects.get(id=req.POST.get('album_id')).close()
-            case 'close_all':
-                Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
-            case 'open':
-                Album.objects.get(id=req.POST.get('album_id')).open()
-            case 'open_all':
-                Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
-            case 'upload':
-                res, blank_or_form = upload(req)
-                if not res:
-                    print(blank_or_form)
-                return JsonResponse({
-                    'success': res,
-                    'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
-                })
-            case 'add_session':
-                pass
+        action = req.POST.get('action')
+
+        if action == 'close':
+            Album.objects.get(id=req.POST.get('album_id')).close()
+        elif action == 'close_all':
+            Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
+        elif action == 'open':
+            Album.objects.get(id=req.POST.get('album_id')).open()
+        elif action == 'open_all':
+            Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
+        elif action == 'upload':
+            res, blank_or_form = upload(req)
+            if not res:
+                print(blank_or_form)
+            return JsonResponse({
+                'success': res,
+                'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
+            })
+        elif action == 'add_session':
+            pass
+
+        # match req.POST.get('action'):
+        #     case 'close':
+        #         Album.objects.get(id=req.POST.get('album_id')).close()
+        #     case 'close_all':
+        #         Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
+        #     case 'open':
+        #         Album.objects.get(id=req.POST.get('album_id')).open()
+        #     case 'open_all':
+        #         Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
+        #     case 'upload':
+        #         res, blank_or_form = upload(req)
+        #         if not res:
+        #             print(blank_or_form)
+        #         return JsonResponse({
+        #             'success': res,
+        #             'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
+        #         })
+        #     case 'add_session':
+        #         pass
     
     albums = Album.objects.all()
 
