@@ -7,13 +7,18 @@
 {% block js %}
     <script>
         ;(function(){
-            const form = document.querySelector('form#id_form_load_csv')
-            const input = document.querySelector('input[type="file"][form="id_form_load_csv"]')
-            input.addEventListener('change', () => {
+            function onBlankUpdateChange(e) {
+                const input = e.target
                 if (input.files.length) {
-                    form.submit()
+                    input.form.submit()
                 }
+            }
+
+            document.querySelectorAll('input[type="file"][name="blank"]').forEach(i => {
+                i.addEventListener('change', onBlankUpdateChange)
             })
+
+            document.querySelector('input[type="file"][form="id_form_load_csv"]').addEventListener('change', onBlankUpdateChange)
         })();
     </script>
 {% endblock js %}
@@ -27,7 +32,7 @@
                     <input type="hidden" name="action" value="load_csv">
                 </form>
                 <label>
-                    <span class="btn btn-sm btn-light shadow-sm">Load CSV</span>
+                    <span class="btn btn-sm btn-light shadow-sm">Load Names (CSV)</span>
                     <input type="file" name="file" class="d-none" form="id_form_load_csv" accept=".csv, text/csv">
                 </label>
             </div>
@@ -36,8 +41,21 @@
         <div class="row">
             {% for blank in blanks %}
                 <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
-                    <div class="card mb-2">
+                    <div class="card mb-2 position-relative">
                         <div style="background-image:url('{{blank.img.url}}');aspect-ratio: 1; background-position: 5.3% 3.2%; background-size: 229%; transform: rotate(90deg); margin: -0.3% 0px; border-radius: .25rem;" class="card-img-top"></div>
+
+                        <div class="position-absolute top-0 end-0">
+                            <form action="." enctype="multipart/form-data" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_blank">
+                                <input type="hidden" name="id" value="{{ blank.id }}">
+                                <label>
+                                    <i class="bi bi-file-arrow-up-fill btn btn-sm text-white-50"></i>
+                                    <input type="file" name="blank" class="d-none" accept=".jpg, .jpeg, image/jpeg">
+                                </label>
+                            </form>
+                        </div>
+
                         <div class="card-body">
                             <h5 class="card-title">{{blank.imgname|slice:"-4:"}}</h5>
                             <h6>{{blank.name}}</h6>

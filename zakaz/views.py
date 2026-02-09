@@ -96,7 +96,7 @@ def index(req):
         #         })
         #     case 'add_session':
         #         pass
-    
+
     albums = Album.objects.all()
 
     ses = req.GET.get('ses')
@@ -200,7 +200,7 @@ def blank(req, sign):
     if isodate:
         order = next((i for i in blank.orders if i['date'] == isodate), None)
         if order:
-            blank.ordered = datetime.fromisoformat(order['date']) 
+            blank.ordered = datetime.fromisoformat(order['date'])
             blank.order = order
             blank.is_closed = True
             blank.is_cancelable = -100 < order['status'] < 200
@@ -283,13 +283,21 @@ def table(req, sign):
                 blank.name = name
                 blank.save()
 
+        if req.POST.get('action') == 'update_blank':
+            file = req.FILES.get('blank')
+            blank_id = req.POST.get('id')
+            blank = Blank.objects.get(id=blank_id)
+            blank.img.delete()
+            blank.img = file
+            blank.save()
+
     for b in blanks:
         if not b.name:
             b.name = b.order['name'] if b.order and 'name' in b.order else next((o['name'] for o in b.orders if 'name' in o), '--')
         for o in b.orders:
             if 'date' not in o:continue
             o['date'] = datetime.fromisoformat(o['date'])
-        
+
 
     return render(req, 'zakaz/table.html', {
        'album': album,
