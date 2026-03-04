@@ -202,6 +202,9 @@ class Album(models.Model):
       self.closed = None
       self.save()
 
+  def cost(self):
+      return sum(b.cost() for b in self.blank_set.all())
+
 
 def upload_blank(order, filename):
   album = order.album

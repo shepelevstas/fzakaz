@@ -119,7 +119,7 @@ def index(req):
             attrs={'ordered': 0, 'blanks': 0},
             add=lambda alb: Sorted( # sorted albums
                 key=lambda alb: (alb.year, alb.group),
-                attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0},
+                attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0, 'sum_lo': 0, 'sum_hi': 0},
             )
         )
     )
@@ -131,6 +131,10 @@ def index(req):
         sh = ses.get_add(alb.sh, add=alb)
         sh.ordered += alb.ordered
         sh.blanks += alb.blanks
+        if alb.year < 5:
+            sh.sum_lo += alb.cost()
+        else:
+            sh.sum_hi += alb.cost()
         sh.add(alb.id, alb)
 
     return render(req, 'zakaz/index.html', {
@@ -249,7 +253,7 @@ def pricelists(req):
     if req.method == "POST":
         data = json.loads(req.body.decode('utf8'))
         id = data.get('id')
-        if id and id.isdigit():
+        if id and ((type(id) is str and id.isdigit()) or type(id) is int):
             pricelist = Pricelist.objects.get(id=id)
         else:
             pricelist = Pricelist()
