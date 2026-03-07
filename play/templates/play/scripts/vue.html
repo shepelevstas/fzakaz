@@ -332,7 +332,6 @@
     data() {
       return {
         over: false,
-        dragged: false,
         dragging,
       }
     },
@@ -340,12 +339,10 @@
     methods: {
       start(e) {
         e.dataTransfer.dropEffect = 'move'
-        this.dragged = true
         this.dragging = true
         this.$emit('dragged')
       },
       end(e) {
-        this.dragged = false
         this.dragging = false
       },
       drop(e) {
