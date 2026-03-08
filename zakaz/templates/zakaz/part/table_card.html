@@ -1,0 +1,51 @@
+{% load mytags %}
+
+<div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
+    <div class="card mb-2 position-relative">
+        <div style="background-image:url('{{blank.img.url}}');aspect-ratio: 1; background-position: 5.3% 3.2%; background-size: 229%; transform: rotate(90deg); margin: -0.3% 0px; border-radius: .25rem;" class="card-img-top"></div>
+
+        <div class="position-absolute top-0 end-0">
+            <form action="." enctype="multipart/form-data" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_blank">
+                <input type="hidden" name="id" value="{{ blank.id }}">
+                <label>
+                    <i class="bi bi-file-arrow-up-fill btn btn-sm text-white-50"></i>
+                    <input type="file" name="blank" class="d-none" accept=".jpg, .jpeg, image/jpeg">
+                </label>
+            </form>
+        </div>
+
+        <div class="card-body">
+            <h5 class="card-title">{{blank.imgname|slice:"-4:"}}</h5>
+            <h6>{{blank.name}}</h6>
+
+            {% for order in blank.orders %}
+                <hr>
+                <small class="text-black-50{% if order.status == -100 %} text-decoration-line-through{% endif %}">{{order.date|default:"--"}}</small>
+                {% for i in order %}
+                    {% if '_' in i %}
+                        <div class="d-flex justify-content-between{% if order.status == -100 %} text-decoration-line-through{% endif %}">
+                            <span>{{i}}</span>
+                            <span>{{order|lookup:i}}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+
+            {% if blank.order %}
+                <hr>
+                <small class="text-black-50">{{blank.ordered}}</small>
+                {% for i in blank.order %}
+                    {% if '_' in i %}
+                        <div class="d-flex justify-content-between">
+                            <span>{{i}}</span>
+                            <span>{{blank.order|lookup:i}}</span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+        </div>
+    </div>
+</div>

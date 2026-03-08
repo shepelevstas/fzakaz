@@ -15,9 +15,13 @@
 {% block js %}
     <template id="id_theme_template">
         <div class="bg-white border rounded p-2">
-            <h6>[[ theme.ru ]] <i class="text-black-50 me-2">([[ theme.key ]])</i>
+            <h6><span class="text-black-50">[[ theme.col ]].</span> [[ theme.ru ]] <i class="text-black-50 me-2">([[ theme.key ]])</i>
                 <button v-if="!locked" @click="$emit('remove')" class="btn btn-outline-danger border-0 p-0"><i class="bi bi-dash-lg"></i></button>
             </h6>
+
+            <div v-if="!locked" class="mb-1">
+                <label class="d-flex align-items-center">№: <input type="number" min="0" v-model.number="theme.col" class="flex-grow-1"></label>
+            </div>
 
             <div class="mb-1">
                 <label class="d-flex align-items-center">имя: <input type="text" v-model="theme.ru" class="flex-grow-1"></label>
@@ -31,7 +35,19 @@
                 <label class="d-flex align-items-center">style: <textarea v-model="theme.blank_img_style" class="flex-grow-1"></textarea></label>
             </div>
 
-            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 user-select-none rounded p-1"
+            <div class="mb-1 d-flex flex-wrap gap-2">
+                <span v-for="(f, index) in formats"
+                    :key="f.key"
+                    class="badge text-bg-secondary btn"
+                    :class="{'text-bg-success': theme_formats.has(f.key)}"
+                    @click="toggle(f.key)"
+                >[[f.key]]</span>
+
+                <span class="badge text-bg-primary btn" @click="add_all"><i class="bi bi-plus-lg"></i> Все</span>
+                <span class="badge text-bg-primary btn" @click="remove_all"><i class="bi bi-dash-lg"></i> Все</span>
+            </div>
+
+            <ul v-if="false" class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 user-select-none rounded p-1"
                 :class="{'bg-success-subtle': dragging}"
                 @dragleave.stop.capture.prevent="enter(null)"
                 @dragenter.stop.prevent="enter(theme.formats.length)"
@@ -69,7 +85,7 @@
                 </li>
             </ul>
 
-            <ul class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 mt-4 user-select-none rounded p-1"
+            <ul v-if="false" class="d-flex flex-wrap row-gap-2 list-unstyled mb-0 mt-4 user-select-none rounded p-1"
                 style="min-height:32px;"
                 :class="{'bg-danger-subtle': dragging}"
                 @dragenter.prevent
@@ -114,6 +130,9 @@
                 },
                 unused_formats() {
                     return [...this.keys.difference(new Set(this.theme.formats))].toSorted()
+                },
+                theme_formats() {
+                    return new Set(this.theme.formats)
                 },
             },
             methods: {
@@ -164,6 +183,13 @@
                 remove_all() {
                     this.theme.formats = []
                 },
+                toggle(key) {
+                    if (this.theme_formats.has(key)) {
+                        this.theme.formats = this.theme.formats.filter(k => k !== key)
+                    } else {
+                        this.theme.formats.push(key)
+                    }
+                },
             },
         }
     </script>
@@ -188,7 +214,7 @@
         <h6>Форматы</h6>
         <div class="border rounded bg-white mb-4">
             <div v-for="format in sorted_formats" :key="format.key" class="border-bottom p-2 py-1 d-flex justify-content-between align-items-center" :class="[selected_format && selected_format.key == format.key ? 'border-primary bg-primary-subtle' : '']" @click="select_format(format.key)">
-                <div>[[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i> </div>
+                <div><span class="text-black-50">[[ format.row ]].</span> [[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i> </div>
                 <div class="text-black-50">[[ format.dir ]]<span v-if="format.en">/[[ format.en ]]</span></div>
                 <div class="text-nowrap ms-2">
                     [[ format.price ]]
@@ -199,6 +225,7 @@
             </div>
 
             <div v-if="!price.locked || selected_format" class="p-2 py-1 d-flex flex-wrap gap-1">
+                <label v-if="!price.locked">№:<input type="number" style="width:3em;" min="0" v-model.number="edit_format.row"></label>
                 <label>имя:<input type="text" v-model="edit_format.ru" required></label>
                 <label v-if="!price.locked">ID:<input type="text" v-model="edit_format.key" required></label>
                 <label>папка:<input type="text" v-model="edit_format.dir" required></label>
@@ -269,8 +296,10 @@
                 },
                 sorted_formats() {
                     if (this.price) {
-                        return Object.values(this.price.formats).toSorted((a, b) => 
-                            a.key.toLowerCase().localeCompare(b.key.toLowerCase())
+                        return Object.values(this.price.formats).toSorted((a, b) =>
+                            Number.isInteger(a.row) && Number.isInteger(b.row)
+                                ? a.row < b.row ? -1 : 1
+                                : a.key.toLowerCase().localeCompare(b.key.toLowerCase())
                         )
                     }
                     return []
@@ -282,33 +311,43 @@
                         this.selected_format = null
                     } else {
                         this.selected_format = this.price.formats[k]
-                        this.edit_format.ru = this.selected_format.ru
-                        this.edit_format.key = this.selected_format.key
-                        this.edit_format.dir = this.selected_format.dir
-                        this.edit_format.en = this.selected_format.en
-                        this.edit_format.price = this.selected_format.price
+                        const keys = ['ru', 'key', 'dir', 'en', 'price', 'row']
+                        keys.forEach(k => {
+                            this.edit_format[k] = this.selected_format[k]
+                        })
+                        // this.edit_format.ru = this.selected_format.ru
+                        // this.edit_format.key = this.selected_format.key
+                        // this.edit_format.dir = this.selected_format.dir
+                        // this.edit_format.en = this.selected_format.en
+                        // this.edit_format.price = this.selected_format.price
                     }
                 },
 
                 save_format() {
                     if (this.selected_format) {
-                        this.selected_format.ru = this.edit_format.ru
-                        this.selected_format.key = this.edit_format.key
-                        this.selected_format.dir = this.edit_format.dir
-                        this.selected_format.en = this.edit_format.en
-                        this.selected_format.price = this.edit_format.price
+                        const keys = ['ru', 'key', 'dir', 'en', 'price', 'row']
+                        keys.forEach(k => {
+                            this.selected_format[k] = this.edit_format[k]
+                        })
+                        // this.selected_format.ru = this.edit_format.ru
+                        // this.selected_format.key = this.edit_format.key
+                        // this.selected_format.dir = this.edit_format.dir
+                        // this.selected_format.en = this.edit_format.en
+                        // this.selected_format.price = this.edit_format.price
                     } else {
                         const key = this.edit_format.key
                         if (key in this.price.formats) {
                             console.log('format key exists')
                             return
                         }
+                        const row = parseInt(this.edit_format.row) || Math.max(...[0, ...this.formsts.map(f=>parseInt(f.row)||0)]) + 1
                         const new_format = {
                             'key': key,
                             'ru': this.edit_format.ru,
                             'dir': this.edit_format.dir,
                             'en': this.edit_format.en,
                             'price': this.edit_format.price,
+                            'row': row,
                         }
                         this.price.formats[key] = new_format
                     }
