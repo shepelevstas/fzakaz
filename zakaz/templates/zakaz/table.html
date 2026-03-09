@@ -14,11 +14,9 @@
                 }
             }
 
-            document.querySelectorAll('input[type="file"][name="blank"]').forEach(i => {
+            document.querySelectorAll('input[type="file"].submit_on_change').forEach(i => {
                 i.addEventListener('change', onBlankUpdateChange)
             })
-
-            document.querySelector('input[type="file"][form="id_form_load_csv"]').addEventListener('change', onBlankUpdateChange)
         })();
     </script>
 {% endblock js %}
@@ -26,14 +24,15 @@
 {% block content %}
     <div class="container-fluid py-2">
         <div class="row mb-4 mt-3">
-            <div class="col-12">
-                <form action="." enctype="multipart/form-data" method="post" class="d-none" id="id_form_load_csv">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="load_csv">
-                </form>
+            <div class="col-12 d-flex gap-2">
                 <label>
                     <span class="btn btn-sm btn-light shadow-sm">Load Names (CSV)</span>
-                    <input type="file" name="file" class="d-none" form="id_form_load_csv" accept=".csv, text/csv">
+                    <input type="file" name="file" class="d-none submit_on_change" form="id_form_load_csv" accept=".csv, text/csv">
+                </label>
+
+                <label>
+                    <span class="btn btn-sm btn-light shadow-sm">Write orders to CSV</span>
+                    <input type="file" name="file" class="d-none submit_on_change" form="id_form_update_csv" accept=".csv, text/csv">
                 </label>
             </div>
         </div>
@@ -44,4 +43,14 @@
             {% endfor %}
         </div>
     </div>
+
+    <form action="." enctype="multipart/form-data" method="post" class="d-none" id="id_form_load_csv">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="load_csv">
+    </form>
+
+    <form action="." enctype="multipart/form-data" method="post" class="d-none" id="id_form_update_csv">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_csv">
+    </form>
 {% endblock content %}

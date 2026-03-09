@@ -76,6 +76,21 @@ class Pricelist(models.Model):
           'locked': self.is_locked,
       }
 
+  def order_to_csv_order(self, order):
+      res = []
+      formats_dict = {item['key']: item for item in self.formats}
+      themes_dict = {item['key']: item for item in self.themes}
+      for k, q in order.items():
+          if '_' not in k: continue
+          [theme, _, fmt] = k.partition('_')
+          if fmt not in formats_dict: continue
+          if theme not in themes_dict: continue
+          row = formats_dict[fmt]['row']
+          col = themes_dict[theme]['col']
+          col = int(col) or 1
+          res.append(f'{row},{col},{q}')
+      return res
+
 
 class Session(models.Model):
   created   = models.DateTimeField(auto_now_add=True)
@@ -223,6 +238,7 @@ class Blank(models.Model):
   img     = models.FileField(upload_to=upload_blank)
   imgname = models.CharField(max_length=64, default='')
   name    = models.CharField(max_length=128, default='')
+  is_prep = models.BooleanField(null=True, blank=True)
 
   def __str__(self):
       return f'{self.album}__{self.imgname}'
@@ -337,6 +353,11 @@ class Blank(models.Model):
           }
           for o in self.orders
       ]
+
+  def csv_order(self):
+      order = next((order for order in self.orders if order['status'] in [100, '100']), None)
+      if order is None: return []
+      return self.album.session.pricelist.order_to_csv_order(order)
 
 
 

@@ -5,13 +5,21 @@
         <div style="background-image:url('{{blank.img.url}}');aspect-ratio: 1; background-position: 5.3% 3.2%; background-size: 229%; transform: rotate(90deg); margin: -0.3% 0px; border-radius: .25rem;" class="card-img-top"></div>
 
         <div class="position-absolute top-0 end-0">
+            <form action="." method="post">
+                {% csrf_token %}
+                <input type="hidden" name="id" value="{{ blank.id }}">
+                <button type="submit" name="action" value="set_prep" class="p-0 btn m-0">
+                    <i class="bi bi-bookmark{% if blank.is_prep %}-fill{% endif %} btn btn-sm text-primary"></i>
+                </button>
+            </form>
+
             <form action="." enctype="multipart/form-data" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_blank">
                 <input type="hidden" name="id" value="{{ blank.id }}">
                 <label>
                     <i class="bi bi-file-arrow-up-fill btn btn-sm text-white-50"></i>
-                    <input type="file" name="blank" class="d-none" accept=".jpg, .jpeg, image/jpeg">
+                    <input type="file" name="blank" class="d-none submit_on_change" accept=".jpg, .jpeg, image/jpeg">
                 </label>
             </form>
         </div>
@@ -32,6 +40,11 @@
                     {% endif %}
                 {% endfor %}
             {% endfor %}
+            {% with csv_order=blank.csv_order|join:';' %}
+                {% if csv_order %}
+                    <em class="text-secondary"><small>{{ blank.csv_order|join:';' }}</small></em>
+                {% endif %}
+            {% endwith %}
 
             {% if blank.order %}
                 <hr>

@@ -6,6 +6,7 @@ from django.core.signing import Signer, BadSignature
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.db.models import F, Q, BooleanField, ExpressionWrapper
+from django.db.models.functions import Length
 
 from foto.forms import UploadBlanksForm, ContactInfoForm
 
@@ -274,7 +275,8 @@ def table(req, sign):
     blanks = album.blank_set.all()
 
     if req.method == "POST":
-        if req.POST.get('action') == 'load_csv':
+        action = req.POST.get('action')
+        if action == 'load_csv':
             file = req.FILES.get('file')
             for line in file:
                 line = line.strip().decode(encoding='cp1251').split(';')
@@ -287,13 +289,20 @@ def table(req, sign):
                 blank.name = name
                 blank.save()
 
-        if req.POST.get('action') == 'update_blank':
+        elif action == 'update_blank':
             file = req.FILES.get('blank')
             blank_id = req.POST.get('id')
             blank = Blank.objects.get(id=blank_id)
             blank.img.delete()
             blank.img = file
             blank.save()
+
+        elif action == 'set_prep':
+            blank_id = req.POST.get('id')
+            blank = Blank.objects.get(id=blank_id)
+            blank.is_prep = not blank.is_prep
+            blank.save()
+            
 
     for b in blanks:
         if not b.name:
@@ -302,8 +311,9 @@ def table(req, sign):
             if 'date' not in o:continue
             o['date'] = datetime.fromisoformat(o['date'])
 
+        b.ord = 1 if b.is_prep else int(b.imgname[-4:]) if next((True for o in b.orders if o['status'] in [100, '100']), False) else 10000 + int(b.imgname[-4:])
 
     return render(req, 'zakaz/table.html', {
        'album': album,
-       'blanks': blanks,
+       'blanks': sorted(blanks, key=lambda b: b.ord),
     })
