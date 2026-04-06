@@ -1,4 +1,5 @@
 import json
+import io
 from datetime import datetime
 # from sortedcontainers import SortedList
 
@@ -302,6 +303,41 @@ def table(req, sign):
             blank = Blank.objects.get(id=blank_id)
             blank.is_prep = not blank.is_prep
             blank.save()
+
+        elif action == 'update_csv':
+            csv0 = req.FILES.get('file')
+            table = []
+            for line in csv0:
+                line = line.decode('cp1251').strip().split(';')
+                if line[0] in ('-', 'hide') or not line[0].isdigit():
+                    table.append(';'.join(line))
+                    continue
+                    
+                imgn = line[0]
+                blank = blanks.filter(imgname__endswith=imgn)
+                if not blank.exists():
+                    table.append(';'.join(line))
+                    continue
+                blank = blank[0]
+                order = blank.csv_order()
+                while len(line)<3:
+                    line.append('')
+                start = 4 if line[2] == 'prep' else 3
+                line = line[:start]
+                if len(line) < start:
+                    line.append('')
+                # line[2] = f'{line[2]}{", " if line[2] else ""}{}'
+                line += order
+                table.append(';'.join(line))
+            csv1 = '\n'.join(table)
+            buffer = io.BytesIO()
+            buffer.write(csv1.encode('cp1251'))
+            res = HttpResponse(buffer.getvalue(), content_type='text/csv')
+            res['Content-Disposition'] = f'attachment; filename="{csv0.name}"'
+            return res
+
+        else:
+            print(f'[ACTION] {action}')
             
 
     for b in blanks:
