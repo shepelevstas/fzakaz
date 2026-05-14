@@ -1,5 +1,6 @@
 import json
 import io
+from functools import lru_cache
 from datetime import datetime
 # from sortedcontainers import SortedList
 
@@ -8,6 +9,7 @@ from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.db.models import F, Q, BooleanField, ExpressionWrapper
 from django.db.models.functions import Length
+from django.utils import timezone
 
 from foto.forms import UploadBlanksForm, ContactInfoForm
 
@@ -55,6 +57,50 @@ class Sorted:
         return sorted(self._dict.values(), key=self._key, reverse=self._rev)
 
 
+@lru_cache
+def albums_cached(ses, sh, last_blank_update):
+    albums = Album.objects.all()
+
+    if ses:
+        [yr, _, nm] = ses.partition('_')
+        ses = Session.objects.get(year=yr, name=nm)
+        albums = albums.filter(session=ses)
+
+    if sh:
+        albums = albums.filter(sh=sh)
+
+    sessions = Sorted( # sorted sessoins
+        key=lambda ses: (ses.item.year, ses.item.created),
+        reverse=True,
+        add=lambda alb: Sorted( # sorted sh
+            key=lambda sh: sh.name,
+            item=alb.session,
+            attrs={'ordered': 0, 'blanks': 0},
+            add=lambda alb: Sorted( # sorted albums
+                key=lambda alb: (alb.year, alb.group),
+                attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0, 'sum_lo': 0, 'sum_hi': 0},
+            )
+        )
+    )
+
+    for alb in albums:
+        alb.cache_progress()
+        ses = sessions.get_add(alb.session_id, add=alb)
+        ses.ordered += alb.ordered
+        ses.blanks += alb.blanks
+        sh = ses.get_add(alb.sh, add=alb)
+        sh.ordered += alb.ordered
+        sh.blanks += alb.blanks
+        if alb.year < 5:
+            sh.sum_lo += alb.cost()
+        else:
+            sh.sum_hi += alb.cost()
+        sh.add(alb.id, alb)
+
+    return albums, sessions
+
+
+
 def index(req):
 
     if req.method == "POST" and req.POST.get('action'):
@@ -99,45 +145,10 @@ def index(req):
         #     case 'add_session':
         #         pass
 
-    albums = Album.objects.all()
-
     ses = req.GET.get('ses')
     sh = req.GET.get('sh')
 
-    if ses:
-        [yr, _, nm] = ses.partition('_')
-        ses = Session.objects.get(year=yr, name=nm)
-        albums = albums.filter(session=ses)
-
-    if sh:
-        albums = albums.filter(sh=sh)
-
-    sessions = Sorted( # sorted sessoins
-        key=lambda ses: (ses.item.year, ses.item.created),
-        reverse=True,
-        add=lambda alb: Sorted( # sorted sh
-            key=lambda sh: sh.name,
-            item=alb.session,
-            attrs={'ordered': 0, 'blanks': 0},
-            add=lambda alb: Sorted( # sorted albums
-                key=lambda alb: (alb.year, alb.group),
-                attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0, 'sum_lo': 0, 'sum_hi': 0},
-            )
-        )
-    )
-    for alb in albums:
-        alb.cache_progress()
-        ses = sessions.get_add(alb.session_id, add=alb)
-        ses.ordered += alb.ordered
-        ses.blanks += alb.blanks
-        sh = ses.get_add(alb.sh, add=alb)
-        sh.ordered += alb.ordered
-        sh.blanks += alb.blanks
-        if alb.year < 5:
-            sh.sum_lo += alb.cost()
-        else:
-            sh.sum_hi += alb.cost()
-        sh.add(alb.id, alb)
+    albums, sessions = albums_cached(ses, sh, Blank.objects.order_by('-updated').values_list('updated', flat=1)[0])
 
     return render(req, 'zakaz/index.html', {
         'albums': albums,
@@ -312,7 +323,7 @@ def table(req, sign):
                 if line[0] in ('-', 'hide') or not line[0].isdigit():
                     table.append(';'.join(line))
                     continue
-                    
+
                 imgn = line[0]
                 blank = blanks.filter(imgname__endswith=imgn)
                 if not blank.exists():
@@ -338,14 +349,17 @@ def table(req, sign):
 
         else:
             print(f'[ACTION] {action}')
-            
+
 
     for b in blanks:
         if not b.name:
             b.name = b.order['name'] if b.order and 'name' in b.order else next((o['name'] for o in b.orders if 'name' in o), '--')
         for o in b.orders:
             if 'date' not in o:continue
-            o['date'] = datetime.fromisoformat(o['date'])
+            date = datetime.fromisoformat(o['date'])
+            if timezone.is_naive(date):
+                date = timezone.make_aware(date)
+            o['date'] = date
 
         b.ord = 1 if b.is_prep else int(b.imgname[-4:]) if next((True for o in b.orders if o['status'] in [100, '100']), False) else 10000 + int(b.imgname[-4:])
 

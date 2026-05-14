@@ -30,7 +30,9 @@
 
             {% for order in blank.orders %}
                 <hr>
-                <small class="text-black-50{% if order.status == -100 %} text-decoration-line-through{% endif %}">{{order.date|default:"--"}}</small>
+                <small class="text-black-50{% if order.status == -100 %} text-decoration-line-through{% endif %}">
+                    {{order.date|date:'Y-m-d H:i'|default:"--"}}
+                </small>
                 {% for i in order %}
                     {% if '_' in i %}
                         <div class="d-flex justify-content-between{% if order.status == -100 %} text-decoration-line-through{% endif %}">

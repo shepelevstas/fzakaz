@@ -179,7 +179,7 @@ class Album(models.Model):
               if b.orders and b.orders[-1].get('status') != -100:
                   ordered += 1
 
-      else:      
+      else:
           blanks = self.blank_set.filter(deleted=None).annotate(
               is_ordered=Case(
                   When(ordered__isnull=True, then=Value(False)),
@@ -209,7 +209,7 @@ class Album(models.Model):
           if not b.order:
               continue
           b.archive_order()
-      
+
       self.closed = datetime.now()
       self.save()
 
@@ -355,6 +355,11 @@ class Blank(models.Model):
       ]
 
   def csv_order(self):
+      if not len(self.orders):
+          return []
+      order = sorted(self.orders, key=lambda o: o['date'], reverse=True)[0]
+      return self.album.session.pricelist.order_to_csv_order(order)
+
       order = next((order for order in self.orders if order['status'] in [100, '100']), None)
       if order is None: return []
       return self.album.session.pricelist.order_to_csv_order(order)
