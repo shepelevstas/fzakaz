@@ -12,3 +12,4 @@ foto/migrations/**
 /media
 /proj/settings_local.py
 proj/settings_local.py
+dumps/**
