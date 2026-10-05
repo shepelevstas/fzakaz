@@ -1,0 +1,50 @@
+{% extends 'hex/base.html' %}
+
+{% block content %}
+  <div class="hex"></div>
+
+  
+  <svg width="0" height="0" style="position:absolute;">
+    <defs>
+      <clipPath id="hex-clip" clipPathUnits="objectBoundingBox">
+        <polygon points="0.5,0 0.93,0.26 0.93,0.76 0.5,1 0.07,0.76 0.07,0.26"/>
+      </clipPath>
+
+      <clipPath id="hex2-clip" clipPathUnits="objectBoundingBox">
+        <path d="
+          M 0.5,0.05 
+          L 0.866,0.262 
+          A 0.05,0.05 0 0,1 0.891,0.305 
+          L 0.891,0.729 
+          A 0.05,0.05 0 0,1 0.866,0.772 
+          L 0.5,0.984 
+          A 0.05,0.05 0 0,1 0.45,0.984 
+          L 0.084,0.772 
+          A 0.05,0.05 0 0,1 0.059,0.729 
+          L 0.059,0.305 
+          A 0.05,0.05 0 0,1 0.084,0.262 
+          L 0.45,0.05 
+          A 0.05,0.05 0 0,1 0.5,0.05 Z" 
+          fill="#2ecc71" 
+          stroke="#27ae60" 
+          stroke-width="0.04" 
+          vector-effect="non-scaling-stroke" />
+      </clipPath>
+      
+    </defs>
+  </svg>
+
+  <svg viewBox="0 0 100 100" width="200" height="200">
+    <defs>
+      <pattern id="port" width="1" height="1" patternContentUnits="objectBoundingBox">
+        <image href="/media/port.jpg" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+      </pattern>
+    </defs>
+    <polygon points="50,1 93,26 93,76 50,100 7,76 7,26" fill="url(#port)" stroke="#27ae60" stroke-width="1" />
+  </svg>
+
+  <img src="/media/port.jpg" alt="" width="200">
+  <img src="/media/port.jpg" alt="" width="200" style="clip-path: url(#hex-clip);">
+  <img src="/media/port.jpg" alt="" width="200" style="clip-path: url(#hex2-clip);">
+
+{% endblock content %}

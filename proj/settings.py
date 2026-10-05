@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # 'kadr',
     # 'play',
     'zakaz',
+    'hex',
 ]
 
 MIDDLEWARE = [

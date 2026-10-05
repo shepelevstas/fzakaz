@@ -10,6 +10,12 @@ urlpatterns = [
 
     path('zakaz2/', include('zakaz.urls')),
 
+
+
+    path('hex', include('hex.urls')),
+
+
+
     path('zakaz/<str:session>__<str:sh>_<int:shyear><str:group>/<uuid:uuid>/', views.zakaz, name='zakaz'),
 
     path('blanks/<str:sign>/', views.signed_view, name="signed_view"),
