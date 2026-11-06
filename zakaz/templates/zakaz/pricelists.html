@@ -19,21 +19,26 @@
                 <button v-if="!locked" @click="$emit('remove')" class="btn btn-outline-danger border-0 p-0"><i class="bi bi-dash-lg"></i></button>
             </h6>
 
-            <div v-if="!locked" class="mb-1">
-                <label class="d-flex align-items-center">№: <input type="number" min="0" v-model.number="theme.col" class="flex-grow-1"></label>
-            </div>
-
-            <div class="mb-1">
-                <label class="d-flex align-items-center">имя: <input type="text" v-model="theme.ru" class="flex-grow-1"></label>
-            </div>
-
-            <div v-if="!locked" class="mb-1">
-                <label class="d-flex align-items-center">ID: <input type="text" v-model="theme.key" class="flex-grow-1"></label>
-            </div>
-
-            <div class="mb-1">
-                <label class="d-flex align-items-center">style: <textarea v-model="theme.blank_img_style" class="flex-grow-1"></textarea></label>
-            </div>
+            <table class='w-100'>
+                <tbody>
+                    <tr v-if='!locked'>
+                        <th>№</th>
+                        <td><input type="number" min="0" v-model.number="theme.col" class="w-100"></td>
+                    </tr>
+                    <tr>
+                        <th>имя</th>
+                        <td><input class="w-100" type="text" v-model="theme.ru"></td>
+                    </tr>
+                    <tr v-if='!locked'>
+                        <th>ID</th>
+                        <td><input type="text" v-model="theme.key" class="w-100"></td>
+                    </tr>
+                    <tr>
+                        <th>style</th>
+                        <td><textarea class="w-100" v-model="theme.blank_img_style"></textarea></td>
+                    </tr>
+                </tbody>
+            </table>
 
             <div class="mb-1 d-flex flex-wrap gap-2">
                 <span v-for="(f, index) in formats"
@@ -44,6 +49,7 @@
                 >[[f.key]]</span>
 
                 <span class="badge text-bg-primary btn" @click="add_all"><i class="bi bi-plus-lg"></i> Все</span>
+
                 <span class="badge text-bg-primary btn" @click="remove_all"><i class="bi bi-dash-lg"></i> Все</span>
             </div>
 
@@ -213,16 +219,24 @@
 
         <h6>Форматы</h6>
         <div class="border rounded bg-white mb-4">
-            <div v-for="format in sorted_formats" :key="format.key" class="border-bottom p-2 py-1 d-flex justify-content-between align-items-center" :class="[selected_format && selected_format.key == format.key ? 'border-primary bg-primary-subtle' : '']" @click="select_format(format.key)">
-                <div><span class="text-black-50">[[ format.row ]].</span> [[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i> </div>
-                <div class="text-black-50">[[ format.dir ]]<span v-if="format.en">/[[ format.en ]]</span></div>
-                <div class="text-nowrap ms-2">
-                    [[ format.price ]]
-                    <button v-if="!price.locked" @click.stop="delete_format(format.key)" class="btn btn-sm btn-outline-danger border-0 p-0">
-                        <i class="bi bi-dash-lg"></i>
-                    </button>
-                </div>
-            </div>
+            <table class='w-100'>
+                <tbody>
+                    <tr v-for='format in sorted_formats' :key='format.key' @click="select_format(format.key)" :class="[selected_format && selected_format.key == format.key ? 'bg-primary-subtle' : '']">
+                        <td class="border-bottom p-2">
+                            <span class="text-black-50">[[ format.row ]].</span> [[ format.ru ]] <i class="text-black-50">([[ format.key ]])</i>
+                        </td>
+                        <td class="text-black-50 border-bottom p-2">
+                            [[ format.dir ]]<span v-if="format.en">/[[ format.en ]]</span>
+                        </td>
+                        <td class="text-nowrap text-end border-bottom p-2">
+                            [[ format.price ]]
+                            <button v-if="!price.locked" @click.stop="delete_format(format.key)" class="btn btn-sm btn-outline-danger border-0 p-0">
+                                <i class="bi bi-dash-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
             <div v-if="!price.locked || selected_format" class="p-2 py-1 d-flex flex-wrap gap-1">
                 <label v-if="!price.locked">№:<input type="number" style="width:3em;" min="0" v-model.number="edit_format.row"></label>
@@ -245,20 +259,23 @@
 
         <h6>Бонус</h6>
         <div class="border rounded bg-white mb-4 p-2">
-            <div class="mb-2"><label class="d-flex align-items-center">
-                <span>Сумма</span>
-                <input class="flex-grow-1 ms-2" type="number" v-model="price.bonus.sum">
-            </label></div>
 
-            <div class="mb-2"><label class="d-flex align-items-center">
-                <span>Текст</span>
-                <input class="flex-grow-1 ms-2" type="text" v-model="price.bonus.text">
-            </label></div>
-
-            <div class="mb-2"><label class="d-flex align-items-center">
-                <span>Если набрана</span>
-                <input class="flex-grow-1 ms-2" type="text" v-model="price.bonus.success">
-            </label></div>
+            <table class="w-100">
+                <tbody>
+                    <tr>
+                        <th style="width:1%;">Сумма</th>
+                        <td><input class="w-100" type="number" v-model="price.bonus.sum"></td>
+                    </tr>
+                    <tr>
+                        <th style="width:1%;">Текст</th>
+                        <td><input class="w-100" type="text" v-model="price.bonus.text"></td>
+                    </tr>
+                    <tr>
+                        <th style="width:1%;" class="text-nowrap">Если набрана</th>
+                        <td><input class="w-100" type="text" v-model="price.bonus.success"></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <Teleport :to="`#id_menu_price_${index}`">
