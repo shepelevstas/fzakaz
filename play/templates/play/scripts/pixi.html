@@ -448,7 +448,7 @@
     },
     PAGE(list, dict) {
       const [type, name, size, opts, children] = list
-      const o = drawFuncs.CONT(['PAGE', 'page', [0, 0], {}, []], dict)
+      const o = this.CONT(['PAGE', 'page', [0, 0], {}, []], dict)
 
       const mask = new PIXI.Graphics()
       mask.name = 'mask'
