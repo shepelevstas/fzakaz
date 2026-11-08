@@ -324,6 +324,17 @@
       bb = Math.max(bb, bounds.y + bounds.height)
     }
 
+    // const [ll, tt, rr, bb] = pipe(
+    //   map(pipe(
+    //     call('getBounds'),
+    //     props(['x', 'y', 'width', 'height']),
+    //     ([x,y,w,h]) => ([x,y,x+w,y+h]),
+    //   )),
+    //   zip,
+    //   ([l,t,r,b]) => ([min(l), min(t), max(r), max(b)])
+    // )(pixi.selected)
+
+
     const ww = rr - ll
     const hh = bb - tt
     const w2 = ww / 2
