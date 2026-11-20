@@ -14,7 +14,7 @@ from django.utils import timezone
 from foto.forms import UploadBlanksForm, ContactInfoForm
 
 from .utils import en
-from .models import Album, Session, Blank, Pricelist
+from .models import Album, Session, Blank, Pricelist, School
 
 
 signer = Signer()
@@ -55,6 +55,79 @@ class Sorted:
 
     def items(self):
         return sorted(self._dict.values(), key=self._key, reverse=self._rev)
+
+
+@lru_cache
+def albums_cached2(ses, sh, last_blank_update):
+    data = {}
+
+    ss = Session.objects.filter(deleted=None).order_by('-year', '-created')
+    if ses:
+        ss = ss.filter(session=ses)
+
+    for s in ss:
+        data[str(s)] = {
+            'session': s,
+            'schools': {},
+            'ordered': 0,
+            'blanks': 0,
+        }
+
+    aa = Album.objects.prefetch_related('school').order_by('school__name', 'sh')
+    if sh:
+        aa = aa.filter(sh=sh)
+
+    for a in aa:
+        a.cache_progress()
+        ses = data.setdefault(
+            str(a.session),
+            {
+                'session': a.session,
+                'schools': {},
+                'ordered': 0,
+                'blanks': 0,
+            }
+        )
+        ses['ordered'] += a.ordered
+        ses['blanks'] += a.blanks
+
+        sh = ses['schools'].setdefault(
+            a.sh,
+            {
+                'school': a.school,
+                'albums': [],
+                'ordered': 0,
+                'blanks': 0,
+                'sum_lo': 0,
+                'sum_hi': 0,
+            }
+        )
+        sh['albums'].append(a)
+        sh['ordered'] += a.ordered
+        sh['blanks'] += a.blanks
+        if a.year < 5:
+            sh['sum_lo'] += a.cost()
+        else:
+            sh['sum_hi'] += a.cost()
+
+    sch = School.objects.all()
+    for s in sch:
+        for ses, ses_data in data.items():
+            ses_data['schools'].setdefault(s.name, {
+                'school': s,
+                'albums': [],
+                'ordered': 0,
+                'blanks': 0,
+                'sum_lo': 0,
+                'sum_hi': 0,
+            })
+
+    for ses, ses_data in data.items():
+        for sh, sh_data in ses_data['schools'].items():
+            sh_data['albums'].sort(key=lambda a: (a.year, a.group))
+
+    return aa, data
+
 
 
 @lru_cache
@@ -123,7 +196,10 @@ def index(req):
                 'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
             })
         elif action == 'add_session':
-            pass
+            ses, _ = Session.objects.get_or_create(
+                year=req.POST.get('session_year'),
+                name=req.POST.get('session_name'),
+            )
 
         # match req.POST.get('action'):
         #     case 'close':
@@ -148,7 +224,7 @@ def index(req):
     ses = req.GET.get('ses')
     sh = req.GET.get('sh')
 
-    albums, sessions = albums_cached(ses, sh, Blank.objects.order_by('-updated').values_list('updated', flat=1)[0])
+    albums, sessions = albums_cached2(ses, sh, Blank.objects.order_by('-updated').values_list('updated', flat=1)[0])
 
     return render(req, 'zakaz/index.html', {
         'albums': albums,

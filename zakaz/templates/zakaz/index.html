@@ -9,12 +9,12 @@
     <a href="{% url 'pricelists' %}">pricelists</a>
     <a href="#" data-bs-toggle="modal" data-bs-target="#id_modal_add_session">+ session</a>
   </div>
-  {% for ses in sessions.items %}
+  {% for ses_name, ses_data in sessions.items %}
     {% include 'zakaz/part/session_row.html' %}
-    {% for sh in ses.items %}
+    {% for sh, sh_data in ses_data.schools.items %}
       {% include 'zakaz/part/sh_row.html' %}
       <div class="row m-0">
-        {% for album in sh.items %}
+        {% for album in sh_data.albums %}
           <div class="col-6 col-sm-4 col-md-3 col-lg-2 p-0 m-0">
             {% include 'zakaz/part/album_card.html' %}
           </div>

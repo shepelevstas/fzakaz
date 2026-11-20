@@ -2,7 +2,7 @@
 <div class="bg-body-secondary sticky-top">
     <div class="d-flex justify-content-between p-1">
         <span>
-            {{ses.item.year}}_{{ses.item.name}}
+            {{ses_name}}
             <span>
                 {% if 'ses' not in request.GET or not request.GET.ses %}
                   <a href="{% set_q_param request.get_full_path 'ses' ses.item %}" title="Показать только эту съемку">
@@ -15,6 +15,6 @@
                 {% endif %}
             </span>
         </span>
-        <span>{{ses.ordered}} / {{ses.blanks}}</span>
+        <span>{{ses_data.ordered}} / {{ses_data.blanks}}</span>
     </div>
 </div>
