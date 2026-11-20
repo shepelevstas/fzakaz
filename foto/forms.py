@@ -3,7 +3,8 @@ from django.conf import settings
 
 from utils import log
 
-from .models import Session, Album
+# from .models import Session, Album
+from zakaz.models import School, Session
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -83,6 +84,7 @@ class UploadBlanksForm(forms.Form):
 
     else:
       self.fields['session'].choices = [(s.id, str(s)) for s in Session.objects.filter(deleted=None)]
-      self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
+      # self.fields['sh'].choices = [(s, s) for s in sorted(set(Album.objects.filter(deleted__isnull=True).values_list('sh', flat=1)))]
+      self.fields['sh'].choices = [(sch.name, sch.name) for sch in School.objects.all()]
 
 

@@ -190,7 +190,8 @@ def index(req):
         elif action == 'upload':
             res, blank_or_form = upload(req)
             if not res:
-                print(blank_or_form)
+                ...
+                # print(blank_or_form)
             return JsonResponse({
                 'success': res,
                 'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
@@ -273,6 +274,8 @@ def upload(req):
             )
 
         return blank is not None, blank
+    else:
+        print('[ ERRORS ]', form.errors)
     print('[WRONG]')
     return False, form
 
