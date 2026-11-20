@@ -28,6 +28,9 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
+    urlpatterns = [
+        path('play/', include('play.urls')),
+    ]
     # urlpatterns += [
     #     path('kadr/', include('kadr.urls')),
     #     path('work/', include('work.urls')),

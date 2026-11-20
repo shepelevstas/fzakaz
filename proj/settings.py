@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-n++z(o=9%+@q8o21@i%)9#wm3w!(o_f+ql&=%mj-)!x)g)d58='
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['localhost','127.0.0.1','83.220.168.4', 'shepelevstas.fvds.ru']
 
@@ -42,7 +42,7 @@ INSTALLED_APPS = [
 
     'foto',
     # 'kadr',
-    # 'play',
+    'play',
     'zakaz',
     'hex',
 ]
