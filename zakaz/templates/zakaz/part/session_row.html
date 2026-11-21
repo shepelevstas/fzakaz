@@ -5,11 +5,11 @@
             {{ses_name}}
             <span>
                 {% if 'ses' not in request.GET or not request.GET.ses %}
-                  <a href="{% set_q_param request.get_full_path 'ses' ses.item %}" title="Показать только эту съемку">
+                  <a href="{% querystring ses=ses_name %}" title="Показать только эту съемку">
                     <i class="bi bi-funnel"></i>
                   </a>
                 {% else %}
-                    <a href="{{ request.get_full_path|rem_q_param:'ses'|rem_q_value:ses.item.sig }}" title="Убрать фильтр по съемке">
+                    <a href="{% querystring ses=None %}" title="Убрать фильтр по съемке">
                       <i class="bi bi-x-circle-fill"></i>
                     </a>
                 {% endif %}

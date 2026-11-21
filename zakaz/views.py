@@ -20,50 +20,15 @@ from .models import Album, Session, Blank, Pricelist, School
 signer = Signer()
 
 
-class Sorted:
-    def __init__(self, key, reverse=False, attrs=None, add=None, item=None):
-        self.__dict__['_dict'] = {}
-        self.__dict__['_key'] = key
-        self.__dict__['_rev'] = reverse
-        self.__dict__['_attrs'] = attrs or {}
-        self.__dict__['_add_fn'] = add
-        self.__dict__['item'] = item
-
-    def __getattr__(self, name):
-        return self._attrs.get(name)
-
-    def __setattr__(self, name, value):
-        self._attrs[name] = value
-
-    def add(self, key, item):
-        self._dict[key] = item
-
-    def get_add(self, key, add=None):
-        if key in self._dict: return self._dict[key]
-        if self._add_fn:
-            item = self._add_fn(add)
-            self._dict[key] = item
-        return self._dict.get(key)
-
-    def get(self, key, fn=None):
-        if fn is None:
-            return self._dict.get(key)
-        if key not in self._dict:
-            new_item = fn()
-            self._dict[key] = new_item
-        return self._dict[key]
-
-    def items(self):
-        return sorted(self._dict.values(), key=self._key, reverse=self._rev)
-
-
 @lru_cache
 def albums_cached2(ses, sh, last_blank_update):
     data = {}
 
-    ss = Session.objects.filter(deleted=None).order_by('-year', '-created')
     if ses:
-        ss = ss.filter(session=ses)
+        [yr, _, nm] = ses.partition('_')
+        ss = Session.objects.filter(name=nm, year=yr)
+    else:
+        ss = Session.objects.filter(deleted=None).order_by('-year', '-created')
 
     for s in ss:
         data[str(s)] = {
@@ -73,10 +38,13 @@ def albums_cached2(ses, sh, last_blank_update):
             'blanks': 0,
         }
 
-    aa = Album.objects.prefetch_related('school').order_by('school__name', 'sh')
-    if sh:
-        aa = aa.filter(sh=sh)
+    sids = list(ss.values_list('id', flat=1))
 
+    if sh:
+        aa = Album.objects.filter(sh=sh, session_id__in=sids).prefetch_related('school').order_by('school__name', 'sh')
+    else:
+        aa = Album.objects.filter(session_id__in=sids).prefetch_related('school').order_by('school__name', 'sh')
+        
     for a in aa:
         a.cache_progress()
         ses = data.setdefault(
@@ -91,7 +59,7 @@ def albums_cached2(ses, sh, last_blank_update):
         ses['ordered'] += a.ordered
         ses['blanks'] += a.blanks
 
-        sh = ses['schools'].setdefault(
+        s = ses['schools'].setdefault(
             a.sh,
             {
                 'school': a.school,
@@ -102,15 +70,18 @@ def albums_cached2(ses, sh, last_blank_update):
                 'sum_hi': 0,
             }
         )
-        sh['albums'].append(a)
-        sh['ordered'] += a.ordered
-        sh['blanks'] += a.blanks
+        s['albums'].append(a)
+        s['ordered'] += a.ordered
+        s['blanks'] += a.blanks
         if a.year < 5:
-            sh['sum_lo'] += a.cost()
+            s['sum_lo'] += a.cost()
         else:
-            sh['sum_hi'] += a.cost()
+            s['sum_hi'] += a.cost()
 
-    sch = School.objects.all()
+    if sh:
+        sch = School.objects.filter(name=sh)
+    else:
+        sch = School.objects.all()
     for s in sch:
         for ses, ses_data in data.items():
             ses_data['schools'].setdefault(s.name, {
@@ -129,103 +100,37 @@ def albums_cached2(ses, sh, last_blank_update):
     return aa, data
 
 
-
-@lru_cache
-def albums_cached(ses, sh, last_blank_update):
-    albums = Album.objects.all()
-
-    if ses:
-        [yr, _, nm] = ses.partition('_')
-        ses = Session.objects.get(year=yr, name=nm)
-        albums = albums.filter(session=ses)
-
-    if sh:
-        albums = albums.filter(sh=sh)
-
-    sessions = Sorted( # sorted sessoins
-        key=lambda ses: (ses.item.year, ses.item.created),
-        reverse=True,
-        add=lambda alb: Sorted( # sorted sh
-            key=lambda sh: sh.name,
-            item=alb.session,
-            attrs={'ordered': 0, 'blanks': 0},
-            add=lambda alb: Sorted( # sorted albums
-                key=lambda alb: (alb.year, alb.group),
-                attrs={'name': alb.sh, 'ordered': 0, 'blanks': 0, 'sum_lo': 0, 'sum_hi': 0},
-            )
-        )
-    )
-
-    for alb in albums:
-        alb.cache_progress()
-        ses = sessions.get_add(alb.session_id, add=alb)
-        ses.ordered += alb.ordered
-        ses.blanks += alb.blanks
-        sh = ses.get_add(alb.sh, add=alb)
-        sh.ordered += alb.ordered
-        sh.blanks += alb.blanks
-        if alb.year < 5:
-            sh.sum_lo += alb.cost()
-        else:
-            sh.sum_hi += alb.cost()
-        sh.add(alb.id, alb)
-
-    return albums, sessions
-
-
-
 def index(req):
-
     if req.method == "POST" and req.POST.get('action'):
         action = req.POST.get('action')
 
-        if action == 'close':
-            Album.objects.get(id=req.POST.get('album_id')).close()
-        elif action == 'close_all':
-            Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
-        elif action == 'open':
-            Album.objects.get(id=req.POST.get('album_id')).open()
-        elif action == 'open_all':
-            Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
-        elif action == 'upload':
-            res, blank_or_form = upload(req)
-            if not res:
-                ...
-                # print(blank_or_form)
-            return JsonResponse({
-                'success': res,
-                'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
-            })
-        elif action == 'add_session':
-            ses, _ = Session.objects.get_or_create(
-                year=req.POST.get('session_year'),
-                name=req.POST.get('session_name'),
-            )
-
-        # match req.POST.get('action'):
-        #     case 'close':
-        #         Album.objects.get(id=req.POST.get('album_id')).close()
-        #     case 'close_all':
-        #         Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
-        #     case 'open':
-        #         Album.objects.get(id=req.POST.get('album_id')).open()
-        #     case 'open_all':
-        #         Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
-        #     case 'upload':
-        #         res, blank_or_form = upload(req)
-        #         if not res:
-        #             print(blank_or_form)
-        #         return JsonResponse({
-        #             'success': res,
-        #             'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
-        #         })
-        #     case 'add_session':
-        #         pass
+        match action:
+            case 'close':
+                Album.objects.get(id=req.POST.get('album_id')).close()
+            case 'close_all':
+                Session.objects.get(id=req.POST.get('session_id')).close_all(req.POST.get('album_sh'))
+            case 'open':
+                Album.objects.get(id=req.POST.get('album_id')).open()
+            case 'open_all':
+                Session.objects.get(id=req.POST.get('session_id')).open_all(req.POST.get('album_sh'))
+            case 'upload':
+                res, blank_or_form = upload(req)
+                return JsonResponse({
+                    'success': res,
+                    'form': blank_or_form.errors if blank_or_form is UploadBlanksForm else None,
+                })
+            case 'add_session':
+                ses, _ = Session.objects.get_or_create(
+                    year=req.POST.get('session_year'),
+                    name=req.POST.get('session_name'),
+                )
 
     ses = req.GET.get('ses')
     sh = req.GET.get('sh')
 
-    albums, sessions = albums_cached2(ses, sh, Blank.objects.order_by('-updated').values_list('updated', flat=1)[0])
+    last_blank_update = Blank.objects.order_by('-updated').values_list('updated', flat=1)[0]
+
+    albums, sessions = albums_cached2(ses, sh, last_blank_update)
 
     return render(req, 'zakaz/index.html', {
         'albums': albums,
